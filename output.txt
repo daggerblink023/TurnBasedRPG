@@ -1,0 +1,10 @@
+日志文件初始化失败: The process cannot access the file 'C:\Users\Lenovo\Documents\TurnBasedRPG\TurnBasedRPG\output.txt' because it is being used by another process.
+[2026-04-17 15:48:16] [游戏启动] 游戏初始化成功
+[2026-04-17 15:48:16] [游戏启动] 开始加载内容
+[2026-04-17 15:48:16] [游戏启动] 创建SpriteBatch成功
+[2026-04-17 15:48:16] [游戏启动] 加载ChineseSpriteFont成功
+[2026-04-17 15:48:16] [游戏启动] 加载ChineseBoldFont成功
+[2026-04-17 15:48:16] [游戏启动] 创建像素纹理成功
+[2026-04-17 15:48:16] [游戏启动] 创建BattleSystem成功
+[2026-04-17 15:48:16] [游戏启动] 创建MainTitle成功
+[2026-04-17 15:48:16] [游戏启动] 内容加载完成
