@@ -1,5 +1,5 @@
-# 在项目根目录创建 backup.bat
 @echo off
+chcp 65001 >nul
 echo 开始备份回合制RPG项目...
 cd /d "%~dp0"
 git add .
