@@ -5,6 +5,7 @@ using TurnBasedRPG.Characters;
 using TurnBasedRPG.Systems;
 using TurnBasedRPG.Buffs.Buff;
 using TurnBasedRPG.Buffs.Debuff;
+using TurnBasedRPG.Characters.Skills.曹丕;
 
 namespace TurnBasedRPG.Systems.SkillManagement;
 
@@ -33,88 +34,6 @@ public class CaoPiSkill : BattleSystem
             return;
         }
         
-        // 确定反击目标
-        Character counterTarget = target;
-        
-        // 检查目标是否有效
-        if (counterTarget == null)
-        {
-            List<Character> enemies = new List<Character>();
-            if (caoPi.IsAlly)
-            {
-                enemies.AddRange(Enemies);
-            }
-            else
-            {
-                enemies.AddRange(Players);
-            }
-            
-            // 筛选存活且可被选中的敌人，排除曹丕自己
-            List<Character> aliveEnemies = enemies.FindAll(e => e.CurrentHealth > 0 && !(e.Name == caoPi.Name && e.IsAlly == caoPi.IsAlly));
-            if (aliveEnemies.Count > 0)
-            {
-                // 随机选择一个存活的敌人
-                Random random = new Random();
-                counterTarget = aliveEnemies[random.Next(aliveEnemies.Count)];
-            }
-            else
-            {
-                return;
-            }
-        }
-        else if (counterTarget.CurrentHealth <= 0)
-        {
-            // 目标已死亡，选择新目标
-            List<Character> enemies = new List<Character>();
-            if (caoPi.IsAlly)
-            {
-                enemies.AddRange(Enemies);
-            }
-            else
-            {
-                enemies.AddRange(Players);
-            }
-            
-            // 筛选存活且可被选中的敌人，排除曹丕自己
-            List<Character> aliveEnemies = enemies.FindAll(e => e.CurrentHealth > 0 && !(e.Name == caoPi.Name && e.IsAlly == caoPi.IsAlly));
-            if (aliveEnemies.Count > 0)
-            {
-                // 随机选择一个存活的敌人
-                Random random = new Random();
-                counterTarget = aliveEnemies[random.Next(aliveEnemies.Count)];
-            }
-            else
-            {
-                return;
-            }
-        }
-        else if (counterTarget.Name == caoPi.Name && counterTarget.IsAlly == caoPi.IsAlly)
-        {
-            // 目标是曹丕自己，选择新目标
-            List<Character> enemies = new List<Character>();
-            if (caoPi.IsAlly)
-            {
-                enemies.AddRange(Enemies);
-            }
-            else
-            {
-                enemies.AddRange(Players);
-            }
-            
-            // 筛选存活且可被选中的敌人，排除曹丕自己
-            List<Character> aliveEnemies = enemies.FindAll(e => e.CurrentHealth > 0 && !(e.Name == caoPi.Name && e.IsAlly == caoPi.IsAlly));
-            if (aliveEnemies.Count > 0)
-            {
-                // 随机选择一个存活的敌人
-                Random random = new Random();
-                counterTarget = aliveEnemies[random.Next(aliveEnemies.Count)];
-            }
-            else
-            {
-                return;
-            }
-        }
-        
         // 创建反击技能
         BaseSkill counterSkill;
         if (isWeiWuHongLiu)
@@ -126,6 +45,7 @@ public class CaoPiSkill : BattleSystem
             counterSkill = new TurnBasedRPG.Characters.Skills.曹丕.制衡();
         }
         caoPi.CalculateSkillValues(counterSkill);
+        
         // [攻击前]设置基础伤害
         if (isWeiWuHongLiu)
         {
@@ -164,159 +84,24 @@ public class CaoPiSkill : BattleSystem
             counterSkill.BaseValue = baseDamage;
         }
         
-        // 创建临时行动槽来处理反击
-        ActionSlot counterSlot = new ActionSlot(0);
-        counterSlot.SetAction(ActionType.Attack, counterSkill);
-        
-        // 投掷硬币
-        counterSlot.FlipCoins(caoPi.Morale);
-        
-        // 添加临时行动槽到映射中，以便找到攻击者
-        if (_slotToCharacterMap != null)
-        {
-            _slotToCharacterMap[counterSlot] = caoPi;
-        }
-        
-        // 记录这次攻击
-        BattleLog.Add($"曹丕{(isWeiWuHongLiu ? "的魏武洪流" : "的制衡")}爆发，对{counterTarget.Name}发动了{(isWeiWuHongLiu ? "魏武洪流" : "制衡")}！");
-        
-        // 直接进行完整的伤害计算
-        // 计算当前总的硬币点数
-        int headsCount = 0;
-        for (int i = 0; i < counterSlot.Coins.Length; i++)
-        {
-            if (counterSlot.Coins[i] == 1)
-                headsCount++;
-        }
-        int finalValue = counterSkill.BaseValue + (headsCount * counterSkill.CoinValue);
-        
-        // 确定攻防等级（曹丕的反击技能使用防御等级计算）
-        int skillLevel = caoPi.FinalDefenseLevel;
-        
-        // 计算skillLevelMultiplier（攻防等级修正乘区）（反击技能使用4.5%倍率）
-        double multiplierRate = 0.045;
-        
-        // 反击技能，使用目标的防御等级进行计算
-        int targetLevelForCalculation = counterTarget.FinalDefenseLevel;
-        int levelDifference = skillLevel - targetLevelForCalculation;
-        double skillLevelMultiplier = 1.0 + ((double)levelDifference * multiplierRate);
-        skillLevelMultiplier = Math.Max(0.2, skillLevelMultiplier);
-        
-        // 一类增伤乘区damageMultiplier：(1+攻击者伤害提升-目标伤害减免)，最低0.2
-        float damageMultiplier = (1 + caoPi.DamageIncrease - counterTarget.DamageReduction);
-        damageMultiplier = Math.Max(0.2f, damageMultiplier);
-        
-        // 获取伤害种类抗性
-        float damageTypeResistance = 1.0f;
-        switch (counterSkill.DamageType)
-        {
-            case DamageType.Physical:
-                damageTypeResistance = counterTarget.PhysicalVulnerability;
-                break;
-            case DamageType.Magic:
-                damageTypeResistance = counterTarget.MagicVulnerability;
-                break;
-            case DamageType.True:
-                damageTypeResistance = counterTarget.TrueVulnerability;
-                break;
-        }
-        
-        // 获取攻击方式抗性
-        float attackTypeResistance = 1.0f;
-        switch (counterSkill.AttackType)
-        {
-            case AttackType.Slash:
-                attackTypeResistance = counterTarget.SlashVulnerability;
-                break;
-            case AttackType.Blunt:
-                attackTypeResistance = counterTarget.BluntVulnerability;
-                break;
-            case AttackType.Pierce:
-                attackTypeResistance = counterTarget.PierceVulnerability;
-                break;
-            case AttackType.Spell:
-                attackTypeResistance = counterTarget.SpellVulnerability;
-                break;
-        }
-        
-        // 确保抗性值不低于0.1
-        damageTypeResistance = Math.Max(0.1f, damageTypeResistance);
-        attackTypeResistance = Math.Max(0.1f, attackTypeResistance);
-        
-        // 最终伤害乘区finalDamageMultiplier：(1+攻击者最终伤害提升-目标最终伤害减免)
-        float finalDamageMultiplier = (1 + caoPi.FinalDamageIncrease - counterTarget.FinalDamageReduction);
-        
-        // 暴击判定
-        bool isCriticalHit = false;
-        float critDamageMultiplier = 1.0f;
-        // 曹丕的反击技能攻击者是曹丕
-        Character caoPiAttacker = caoPi;
-        if (caoPiAttacker != null)
-        {
-            // 计算暴击概率
-            float skillCritRate = counterSkill.CritRate;
-            float targetCritResistance = counterTarget.CritResistance;
-            float firstStepCritRate = Math.Max(0, skillCritRate - targetCritResistance);
-            float finalCritRateStep = counterSkill.FinalCritRate - counterTarget.FinalCritResistance;
-            float totalCritRate = Math.Max(0, firstStepCritRate + finalCritRateStep);
-            totalCritRate = Math.Min(totalCritRate, 1.0f); // 超出100%视为100%
-            
-            // 按概率判定是否暴击
-            Random caoPiRandom = new Random();
-            double randomValue = caoPiRandom.NextDouble();
-            if (randomValue < totalCritRate)
-            {
-                isCriticalHit = true;
-            }
-            
-            // 计算暴击伤害乘区
-            if (isCriticalHit)
-            {
-                float skillCritDamage = counterSkill.CritDamage;
-                float targetCritDamageResistance = counterTarget.CritDamageResistance;
-                critDamageMultiplier = 1 + (skillCritDamage - targetCritDamageResistance);
-                critDamageMultiplier = Math.Max(1.0f, critDamageMultiplier); // 不低于1
-            }
-        }
-        
-        // 计算最终伤害
-        int damage = (int)(finalValue * skillLevelMultiplier * damageMultiplier * finalDamageMultiplier * attackTypeResistance * damageTypeResistance * critDamageMultiplier);
-        
-        // 应用伤害
-        ApplyDamage(damage, counterTarget, counterSlot);
-        
-        // 添加伤害结算日志
-        int shieldBefore = GetCharacterShield(counterTarget);
-        int shieldAfter = GetCharacterShield(counterTarget);
-        int healthBefore = counterTarget.CurrentHealth;
-        int healthAfter = counterTarget.CurrentHealth;
-        int shieldDamageTaken = shieldBefore - shieldAfter;
-        int healthDamageTaken = healthBefore - healthAfter;
-        
-        // 记录伤害统计
-        Statistics.RecordDamage(caoPi, counterSkill.Name, shieldDamageTaken, healthDamageTaken);
-        
-        if (shieldDamageTaken > 0 && healthDamageTaken > 0)
-        {
-            BattleLog.Add($"{(isWeiWuHongLiu ? "魏武洪流" : "制衡")}共造成{shieldDamageTaken}点护盾伤害,{healthDamageTaken}点体力伤害");
-        }
-        else if (shieldDamageTaken > 0)
-        {
-            BattleLog.Add($"{(isWeiWuHongLiu ? "魏武洪流" : "制衡")}共造成{shieldDamageTaken}点护盾伤害");
-        }
-        else if (healthDamageTaken > 0)
-        {
-            BattleLog.Add($"{(isWeiWuHongLiu ? "魏武洪流" : "制衡")}共造成{healthDamageTaken}点体力伤害");
-        }
-        else
-        {
-            BattleLog.Add($"{(isWeiWuHongLiu ? "魏武洪流" : "制衡")}共造成0点伤害");
-        }
-        
-        // 处理魏武洪流技能的效果：使所有目标获得1级虚弱，持续2回合
         if (isWeiWuHongLiu)
         {
-            // 使所有敌方单位获得1级虚弱，持续2回合
+            // 魏武洪流：群攻 - 对所有敌方单位造成相同伤害
+            // 投掷硬币
+            int headsCount = 0;
+            for (int i = 0; i < counterSkill.CoinCount; i++)
+            {
+                headsCount += new Random().Next(2); // 简单模拟硬币投掷
+            }
+            int finalValue = counterSkill.BaseValue + (headsCount * counterSkill.CoinValue);
+            
+            // 初始化_allTargetsDamage列表
+            _allTargetsDamage = new List<TargetDamageInfo>();
+            
+            // 使用ProcessAreaAttack对所有敌方单位造成相同伤害
+            ProcessAreaAttack(caoPi, finalValue, counterSkill, recordToAllTargetsDamage: true);
+            
+            // 处理魏武洪流技能的效果：使所有目标获得1级虚弱，持续2回合
             List<Character> enemies = new List<Character>();
             if (caoPi.IsAlly)
             {
@@ -334,12 +119,138 @@ public class CaoPiSkill : BattleSystem
                     buffHandler.AddBuff(enemy, new 虚弱(2, 1));
                 }
             }
+            
+            // 魏武洪流获得3级嗣业承祚强度
+            var siYeChengZuoBuff = buffHandler.GetBuffs(caoPi).Find(b => b is 嗣业承祚);
+            if (siYeChengZuoBuff != null)
+            {
+                siYeChengZuoBuff.Strength += 3;
+                // 处理溢出
+                if (siYeChengZuoBuff is 嗣业承祚)
+                {
+                    ((嗣业承祚)siYeChengZuoBuff).HandleOverflow(caoPi, buffHandler, this);
+                }
+            }
         }
-        
-        // 处理制衡技能的效果：为同队所有持有增益效果不低于3个的魏国武将施加1级持续3回合的天恩
-        if (!isWeiWuHongLiu)
+        else
         {
-            // 为同队所有持有增益效果不低于3个的魏国武将施加1级持续3回合的天恩
+            // 制衡：单个目标伤害
+            // 确定反击目标
+            Character counterTarget = target;
+            
+            // 检查目标是否有效
+            if (counterTarget == null)
+            {
+                List<Character> enemies = new List<Character>();
+                if (caoPi.IsAlly)
+                {
+                    enemies.AddRange(Enemies);
+                }
+                else
+                {
+                    enemies.AddRange(Players);
+                }
+                
+                // 筛选存活且可被选中的敌人，排除曹丕自己
+                List<Character> aliveEnemies = enemies.FindAll(e => e.CurrentHealth > 0 && !(e.Name == caoPi.Name && e.IsAlly == caoPi.IsAlly));
+                if (aliveEnemies.Count > 0)
+                {
+                    // 随机选择一个存活的敌人
+                    Random random = new Random();
+                    counterTarget = aliveEnemies[random.Next(aliveEnemies.Count)];
+                }
+                else
+                {
+                    return;
+                }
+            }
+            else if (counterTarget.CurrentHealth <= 0)
+            {
+                // 目标已死亡，选择新目标
+                List<Character> enemies = new List<Character>();
+                if (caoPi.IsAlly)
+                {
+                    enemies.AddRange(Enemies);
+                }
+                else
+                {
+                    enemies.AddRange(Players);
+                }
+                
+                // 筛选存活且可被选中的敌人，排除曹丕自己
+                List<Character> aliveEnemies = enemies.FindAll(e => e.CurrentHealth > 0 && !(e.Name == caoPi.Name && e.IsAlly == caoPi.IsAlly));
+                if (aliveEnemies.Count > 0)
+                {
+                    // 随机选择一个存活的敌人
+                    Random random = new Random();
+                    counterTarget = aliveEnemies[random.Next(aliveEnemies.Count)];
+                }
+                else
+                {
+                    return;
+                }
+            }
+            else if (counterTarget.Name == caoPi.Name && counterTarget.IsAlly == caoPi.IsAlly)
+            {
+                // 目标是曹丕自己，选择新目标
+                List<Character> enemies = new List<Character>();
+                if (caoPi.IsAlly)
+                {
+                    enemies.AddRange(Enemies);
+                }
+                else
+                {
+                    enemies.AddRange(Players);
+                }
+                
+                // 筛选存活且可被选中的敌人，排除曹丕自己
+                List<Character> aliveEnemies = enemies.FindAll(e => e.CurrentHealth > 0 && !(e.Name == caoPi.Name && e.IsAlly == caoPi.IsAlly));
+                if (aliveEnemies.Count > 0)
+                {
+                    // 随机选择一个存活的敌人
+                    Random random = new Random();
+                    counterTarget = aliveEnemies[random.Next(aliveEnemies.Count)];
+                }
+                else
+                {
+                    return;
+                }
+            }
+            
+            // 创建临时行动槽来处理反击
+            ActionSlot counterSlot = new ActionSlot(0);
+            counterSlot.SetAction(ActionType.Attack, counterSkill);
+            
+            // 投掷硬币
+            counterSlot.FlipCoins(caoPi.Morale);
+            
+            // 添加临时行动槽到映射中，以便找到攻击者
+            if (_slotToCharacterMap != null)
+            {
+                _slotToCharacterMap[counterSlot] = caoPi;
+            }
+            
+            // 初始化_allTargetsDamage列表
+            _allTargetsDamage = new List<TargetDamageInfo>();
+            
+            // 直接进行完整的伤害计算
+            // 计算当前总的硬币点数
+            int headsCount = 0;
+            for (int i = 0; i < counterSlot.Coins.Length; i++)
+            {
+                if (counterSlot.Coins[i] == 1)
+                    headsCount++;
+            }
+            int finalValue = counterSkill.BaseValue + (headsCount * counterSkill.CoinValue);
+            
+            // 使用CalculateDamageForTarget对单个目标造成伤害
+            var damageInfo = CalculateDamageForTarget(caoPi, counterTarget, finalValue, counterSkill);
+            _allTargetsDamage.Add(damageInfo);
+            
+            // 记录伤害统计
+            Statistics.RecordDamage(caoPi, counterSkill.Name, damageInfo.ShieldDamage, damageInfo.HealthDamage);
+            
+            // 处理制衡技能的效果：为同队所有持有增益效果不低于3个的魏国武将施加1级持续3回合的天恩
             List<Character> allies = new List<Character>();
             if (caoPi.IsAlly)
             {
@@ -362,30 +273,12 @@ public class CaoPiSkill : BattleSystem
                     }
                 }
             }
-        }
-        
-        // 消耗嗣业承祚强度（仅制衡需要）
-        if (!isWeiWuHongLiu)
-        {
-            var siYeChengZuoBuff = buffHandler.GetBuffs(caoPi).Find(b => b is 嗣业承祚);
+            
+            // 消耗嗣业承祚强度（仅制衡需要）
+            var siYeChengZuoBuff = buffHandler.GetBuffs(caoPi).Find(b => b is Buffs.Buff.嗣业承祚);
             if (siYeChengZuoBuff != null)
             {
                 siYeChengZuoBuff.Strength = Math.Max(0, siYeChengZuoBuff.Strength - 1);
-            }
-        }
-        
-        // 魏武洪流获得3级嗣业承祚强度
-        if (isWeiWuHongLiu)
-        {
-            var siYeChengZuoBuff = buffHandler.GetBuffs(caoPi).Find(b => b is 嗣业承祚);
-            if (siYeChengZuoBuff != null)
-            {
-                siYeChengZuoBuff.Strength += 3;
-                // 处理溢出
-                if (siYeChengZuoBuff is 嗣业承祚)
-                {
-                    ((嗣业承祚)siYeChengZuoBuff).HandleOverflow(caoPi, buffHandler, this);
-                }
             }
         }
     }
@@ -468,13 +361,13 @@ public class CaoPiSkill : BattleSystem
                 if (isCritical)
                 {
                     additionalDamage = (int)(additionalDamage * 1.5f); // 假设暴击伤害为1.5倍
-                    BattleLog.Add($"定策安邦的附加伤害产生了暴击！");
+
                 }
                 
                 // 使用ApplyDamage方法处理真实伤害
                 ApplyDamage(additionalDamage, target, slot, isDirectDamage: true);
+
                 
-                BattleLog.Add($"定策安邦对{target.Name}造成{additionalDamage}点真实伤害");
                 
                 // 若附加伤害产生了暴击，额外获得1级嗣业承祚
                 if (isCritical)
@@ -493,7 +386,7 @@ public class CaoPiSkill : BattleSystem
             }
         }
         
-        // 处理受禅代汉技能：[使用前]使基础伤害提升（[嗣业承祚]的状态强度*10）%
+        // 处理受禅代汉技能：[使用前]使基础伤害提升（嗣业承祚的状态强度*10%）
         if (slot.SkillName == "受禅代汉" && slot.IsFirstCoin)
         {
             var siYeChengZuoBuff = buffHandler.GetBuffs(caoPi).Find(b => b is 嗣业承祚);
@@ -502,7 +395,7 @@ public class CaoPiSkill : BattleSystem
                 float damageMultiplier = 1.0f + (siYeChengZuoBuff.Strength * 0.1f);
                 slot.BaseDamageMultiplier = damageMultiplier;
                 
-                // 使本技能的拼点威力提升4
+                // 使本技能的硬币威力提升4
                 slot.CompetingPower += 4;
                 
                 // 若自身的嗣业承祚强度高于3级，则高出的每级强度使本技能的硬币点数提升1
@@ -538,7 +431,7 @@ public class CaoPiSkill : BattleSystem
             }
         }
         
-        // 处理受禅代汉技能：[攻击后]为全队魏国武将施加护盾，护盾值相当于本技能总伤害量的50%
+        // 处理受禅代汉技能：[攻击后]为全队魏国武将施加护盾，护盾值相当于本技能总伤害的50%
         if (slot.SkillName == "受禅代汉" && slot.IsLastCoin)
         {
             int totalDamage = slot.TotalDamage;
@@ -566,7 +459,7 @@ public class CaoPiSkill : BattleSystem
                 }
             }
             
-            // 清零嗣业承祚的状态强度，然后将强度设置为3级
+            // 清空嗣业承祚的状态强度，然后将强度设置为3级
             var siYeChengZuoBuff = buffHandler.GetBuffs(caoPi).Find(b => b is 嗣业承祚);
             if (siYeChengZuoBuff != null)
             {

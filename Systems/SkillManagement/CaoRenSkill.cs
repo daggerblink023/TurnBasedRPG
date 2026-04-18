@@ -1,4 +1,4 @@
-using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using TurnBasedRPG.Characters;
@@ -112,7 +112,7 @@ public class CaoRenSkill : BattleSystem
         _slotToCharacterMap[counterSlot] = caoRen;
         
         // 记录这次攻击
-        BattleLog.Add($"曹仁积蓄的锋芒爆发，对{counterTarget.Name}发动了默守蓄锋！");
+
         
         // 直接进行完整的伤害计算
         // 计算当前总的硬币点数
@@ -133,7 +133,7 @@ public class CaoRenSkill : BattleSystem
         // 默守蓄锋是反击技能，使用目标的防御等级进行计算
         int targetLevelForCalculation = counterTarget.FinalDefenseLevel;
         int levelDifference = skillLevel - targetLevelForCalculation;
-        double skillLevelMultiplier = 1.0 + ((double)levelDifference * multiplierRate);
+        double skillLevelMultiplier = 1.5 + ((double)levelDifference * multiplierRate);
         skillLevelMultiplier = Math.Max(0.2, skillLevelMultiplier);
         
         // 一类增伤乘区damageMultiplier：(1+攻击者伤害提升-目标伤害减免)，最低0.2
@@ -248,19 +248,19 @@ public class CaoRenSkill : BattleSystem
         
         if (shieldDamageTaken > 0 && healthDamageTaken > 0)
         {
-            BattleLog.Add($"默守蓄锋共造成{shieldDamageTaken}点护盾伤害,{healthDamageTaken}点体力伤害");
+
         }
         else if (shieldDamageTaken > 0)
         {
-            BattleLog.Add($"默守蓄锋共造成{shieldDamageTaken}点护盾伤害");
+
         }
         else if (healthDamageTaken > 0)
         {
-            BattleLog.Add($"默守蓄锋共造成{healthDamageTaken}点体力伤害");
+
         }
         else
         {
-            BattleLog.Add($"默守蓄锋共造成0点伤害");
+
         }
         
         // 处理默守蓄锋技能的效果：为自身与同队其余魏国武将获得最大生命10%的护盾

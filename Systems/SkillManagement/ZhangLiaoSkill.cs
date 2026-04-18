@@ -116,7 +116,7 @@ public class ZhangLiaoSkill : BattleSystem
         }
         
         // 记录这次攻击
-        BattleLog.Add($"张辽{zhangLiaoTeamInfo}的追击爆发，对{attackTarget.Name}{targetTeamInfo}发动了破溃！");
+
         
         // 直接进行完整的伤害计算
         
@@ -138,7 +138,7 @@ public class ZhangLiaoSkill : BattleSystem
         // 破溃是攻击技能，使用目标的防御等级进行计算
         int targetLevelForCalculation = attackTarget.FinalDefenseLevel;
         int levelDifference = skillLevel - targetLevelForCalculation;
-        double skillLevelMultiplier = 1.0 + ((double)levelDifference * multiplierRate);
+        double skillLevelMultiplier = 1.5 + ((double)levelDifference * multiplierRate);
         skillLevelMultiplier = Math.Max(0.2, skillLevelMultiplier);
         
         // 一类增伤乘区damageMultiplier：(1+攻击者伤害提升-目标伤害减免)，最低0.2
@@ -237,19 +237,19 @@ public class ZhangLiaoSkill : BattleSystem
         
         if (shieldDamageTaken > 0 && healthDamageTaken > 0)
         {
-            BattleLog.Add($"破溃共造成{shieldDamageTaken}点护盾伤害,{healthDamageTaken}点体力伤害");
+
         }
         else if (shieldDamageTaken > 0)
         {
-            BattleLog.Add($"破溃共造成{shieldDamageTaken}点护盾伤害");
+
         }
         else if (healthDamageTaken > 0)
         {
-            BattleLog.Add($"破溃共造成{healthDamageTaken}点体力伤害");
+
         }
         else
         {
-            BattleLog.Add($"破溃共造成0点伤害");
+
         }
         
         // 恢复最终伤害加成
@@ -313,7 +313,7 @@ public class ZhangLiaoSkill : BattleSystem
                 if (trueDamage > 0)
                 {
                     ApplyDamage(trueDamage, target, slot, isDirectDamage: true);
-                    BattleLog.Add($"霜戟对{target.Name}额外造成{trueDamage}点真实伤害");
+
                 }
             }
         }
@@ -419,7 +419,7 @@ public class ZhangLiaoSkill : BattleSystem
                 if (enemy.CurrentHealth > 0)
                 {
                     ApplyDamage(finalValue, enemy, slot, isDirectDamage: true);
-                    BattleLog.Add($"威震逍遥津对{enemy.Name}造成{finalValue}点真实伤害");
+
                 }
             }
             

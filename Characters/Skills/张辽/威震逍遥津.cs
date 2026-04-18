@@ -1,10 +1,10 @@
-using System;
+﻿﻿using System;
 using Microsoft.Xna.Framework;
 using TurnBasedRPG.Systems;
 
 namespace TurnBasedRPG.Characters.Skills.张辽;
 
-public class 威震逍遥津 : BaseSkill
+public class 威震逍遥津: BaseSkill
 {
     public 威震逍遥津() : base("威震逍遥津", ActionType.Attack, DamageType.Physical, AttackType.Pierce)
     {

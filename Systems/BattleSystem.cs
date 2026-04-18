@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -42,6 +42,21 @@ public class CounterSkillInfo
     public int OriginalHealthDamage { get; set; }
 }
 
+// 单个目标的伤害信息
+public class TargetDamageInfo
+{
+    public Character Target { get; set; }
+    public int ShieldDamage { get; set; }
+    public int HealthDamage { get; set; }
+    
+    public TargetDamageInfo(Character target, int shieldDamage, int healthDamage)
+    {
+        Target = target;
+        ShieldDamage = shieldDamage;
+        HealthDamage = healthDamage;
+    }
+}
+
 // 伤害计算结果（包含所有乘区）
 public class DamageCalculationResult
 {
@@ -78,8 +93,10 @@ public class BattleSystem
     public int CurrentPlayerSlot { get; set; }
     public BattlePhase CurrentPhase { get; set; }
     public bool BattleEnded { get; set; }
+    public bool IsPaused { get; set; } = false; // 战斗暂停标志
     public string BattleMessage { get; set; }
     public List<string> BattleLog { get; set; }
+    public List<string> PreviousBattleLog { get; set; } // 上一回合的战斗日志
     public Dictionary<ActionSlot, Character> _slotToCharacterMap { get; set; } // 行动槽到角色的映射
     public BattleStatistics Statistics { get; set; } = new BattleStatistics();
 
@@ -122,8 +139,10 @@ public class BattleSystem
     private int[] _rerolledCoins; // 存储已重投的硬币结果
     private int _totalShieldDamage; // 累积的护盾伤害
     private int _totalHealthDamage; // 累积的体力伤害
+    protected List<TargetDamageInfo> _allTargetsDamage; // 所有目标的伤害信息（包括主要目标和次级目标）
     private string _attackerName; // 攻击者名称
     private string _attackSkillName; // 攻击技能名称
+    private string _targetSkillName; // 目标（敌方）技能名称（用于拼点日志）
     private bool _attackEngagedInShowdown; // 标记攻击是否进行了拼点
     private int _targetDefenseLevel; // 目标的防御等级
     
@@ -256,6 +275,7 @@ public class BattleSystem
         BattleEnded = false;
         BattleMessage = "敌人正在选择技能...";
         BattleLog = new List<string>();
+        PreviousBattleLog = new List<string>(); // 初始化上一回合的战斗日志
         _resolutionStep = 0;
         _deflectionTriggeredThisRound = false;
         _characterShields = new Dictionary<Character, int>();
@@ -1668,12 +1688,21 @@ public class BattleSystem
         
         // 根据攻击对抗类型和技能类型计算skillLevelMultiplier（攻防等级修正乘区）
         double skillLevelMultiplier;
-        double multiplierRate = 0.03; // 默认倍率：3%
+        double multiplierRate = 0.03; // 默认倍率：3%（常规攻击技能）
+        
+        // 检查是否是反击技能或特殊反击（使用4.5%倍率）
+        bool isCounterOrSpecialSkill = slot.Type == ActionType.Counter || 
+            (slot.Skill != null && slot.Skill.IsSpecialCounterSkill);
+        
+        if (isCounterOrSpecialSkill)
+        {
+            multiplierRate = 0.045; // 反击技能和特殊反击4.5%
+        }
         
         // 无论是否对抗防御技能，都使用目标的防御等级进行计算
         int targetLevelForCalculation = targetSkillLevel;
         int levelDifference = skillLevel - targetLevelForCalculation;
-        skillLevelMultiplier = 1.0 + ((double)levelDifference * multiplierRate);
+        skillLevelMultiplier = 1.5 + ((double)levelDifference * multiplierRate);
         
         // skillLevelMultiplier的计算结果不低于0.2
         skillLevelMultiplier = Math.Max(0.2, skillLevelMultiplier);
@@ -2499,8 +2528,10 @@ public class BattleSystem
                 _attackLevel = currentPlayer.FinalAttackLevel;
                 _totalShieldDamage = 0; // 初始化累积护盾伤害
                 _totalHealthDamage = 0; // 初始化累积体力伤害
+                _allTargetsDamage = new List<TargetDamageInfo>(); // 初始化所有目标的伤害信息列表
                 _attackerName = currentPlayer.Name; // 设置攻击者名称
                 _attackSkillName = playerSlot.GetSkillName(); // 获取攻击技能名称
+                _targetSkillName = enemySlot.GetSkillName(); // 获取目标（敌方）技能名称
                 _attackEngagedInShowdown = true; // 进行拼点
                 _targetDefenseLevel = currentEnemy.FinalDefenseLevel; // 设置目标的防御等级
                 
@@ -2510,8 +2541,17 @@ public class BattleSystem
                 // 设置状态为等待攻击
                 _resolutionState = ResolutionState.WaitingForAttack;
                 
-                // 攻击拼点胜利，玩家提高士气，敌方降低士气
+                // 添加拼点胜利日志
+                string playerTeamInfo = currentPlayer.IsAlly ? "-我方" : "-敌方";
+                string enemyTeamInfo = currentEnemy.IsAlly ? "-我方" : "-敌方";
+                string playerSkillName = playerSlot.GetSkillName();
+                string enemySkillName = enemySlot.GetSkillName();
                 int moraleGain = 2 + Math.Max(0, totalRounds - 1); // 至少2点，每多一次拼点+1
+                
+                BattleLog.Add($"{currentPlayer.Name}{playerTeamInfo} 的 {playerSkillName} 与 {currentEnemy.Name}{enemyTeamInfo} 的 {enemySkillName} 拼点胜利，恢复{moraleGain}点士气");
+                BattleLog.Add("");
+                
+                // 攻击拼点胜利，玩家提高士气，敌方降低士气
                 currentPlayer.AdjustMorale(moraleGain);
                 currentEnemy.AdjustMorale(-2); // 敌方固定扣除2点士气值
                 // 移除不符合要求的BattleLog输出
@@ -2530,8 +2570,10 @@ public class BattleSystem
                 _attackLevel = currentEnemy.FinalAttackLevel;
                 _totalShieldDamage = 0; // 初始化累积护盾伤害
                 _totalHealthDamage = 0; // 初始化累积体力伤害
+                _allTargetsDamage = new List<TargetDamageInfo>(); // 初始化所有目标的伤害信息列表
                 _attackerName = currentEnemy.Name; // 设置攻击者名称
                 _attackSkillName = enemySlot.GetSkillName(); // 获取攻击技能名称
+                _targetSkillName = playerSlot.GetSkillName(); // 获取目标（玩家）技能名称
                 _attackEngagedInShowdown = true; // 进行拼点
                 _targetDefenseLevel = currentPlayer.FinalDefenseLevel; // 设置目标的防御等级
                 
@@ -2541,8 +2583,17 @@ public class BattleSystem
                 // 设置状态为等待攻击
                 _resolutionState = ResolutionState.WaitingForAttack;
                 
-                // 攻击拼点失败，玩家降低士气，敌方提高士气
+                // 添加拼点胜利日志（敌方胜利）
+                string playerTeamInfo = currentPlayer.IsAlly ? "-我方" : "-敌方";
+                string enemyTeamInfo = currentEnemy.IsAlly ? "-我方" : "-敌方";
+                string playerSkillName = playerSlot.GetSkillName();
+                string enemySkillName = enemySlot.GetSkillName();
                 int moraleGain = 2 + Math.Max(0, totalRounds - 1); // 至少2点，每多一次拼点+1
+                
+                BattleLog.Add($"{currentEnemy.Name}{enemyTeamInfo} 的 {enemySkillName} 与 {currentPlayer.Name}{playerTeamInfo} 的 {playerSkillName} 拼点胜利，恢复{moraleGain}点士气");
+                BattleLog.Add("");
+                
+                // 攻击拼点失败，玩家降低士气，敌方提高士气
                 currentEnemy.AdjustMorale(moraleGain);
                 currentPlayer.AdjustMorale(-2); // 固定扣除2点士气值
                 // 移除不符合要求的BattleLog输出
@@ -2614,6 +2665,7 @@ public class BattleSystem
             _attackLevel = attacker != null ? attacker.FinalAttackLevel : 1;
             _totalShieldDamage = 0; // 初始化累积护盾伤害
             _totalHealthDamage = 0; // 初始化累积体力伤害
+            _allTargetsDamage = new List<TargetDamageInfo>(); // 初始化所有目标的伤害信息列表
             _attackerName = attacker?.Name ?? "攻击者"; // 设置攻击者名称
             _attackSkillName = attackSlot.GetSkillName(); // 获取攻击技能名称
             _attackEngagedInShowdown = true; // 进行拼点
@@ -2625,6 +2677,12 @@ public class BattleSystem
             // 设置状态为等待攻击
             _resolutionState = ResolutionState.WaitingForAttack;
             
+            // 闪避失败，添加日志
+            string dodgerTeamInfo = dodger?.IsAlly == true ? "-我方" : "-敌方";
+            string dodgeSkillName = dodgeSlot.GetSkillName();
+            BattleLog.Add($"{dodger?.Name ?? "目标"}{dodgerTeamInfo} 闪避失败，闪避技能 {dodgeSkillName} 被摧毁");
+            BattleLog.Add("");
+            
             // 闪避失败，降低士气
             if (dodger != null)
             {
@@ -2635,7 +2693,14 @@ public class BattleSystem
         {
             // 攻击技能当前总点数小于闪避技能总点数，不造成伤害
             // 不标记闪避槽为已销毁，让它继续与后续的攻击行动槽拼点
-            BattleLog.Add($"{dodger?.Name ?? "目标"}成功闪避了攻击");
+            
+            // 添加闪避成功日志
+            string dodgerTeamInfo = dodger?.IsAlly == true ? "-我方" : "-敌方";
+            string attackerTeamInfo = attacker?.IsAlly == true ? "-我方" : "-敌方";
+            string dodgeSkillName = dodgeSlot.GetSkillName();
+            string attackSkillName = attackSlot.GetSkillName();
+            BattleLog.Add($"{dodger?.Name ?? "目标"}{dodgerTeamInfo} 使用闪避技能 {dodgeSkillName} 成功闪避了 {attacker?.Name ?? "攻击者"}{attackerTeamInfo}的 {attackSkillName}");
+            BattleLog.Add("");
             
             // 闪避成功，提高士气
             if (dodger != null)
@@ -2670,6 +2735,7 @@ public class BattleSystem
         _attackLevel = attacker.FinalAttackLevel;
         _totalShieldDamage = 0; // 初始化累积护盾伤害
         _totalHealthDamage = 0; // 初始化累积体力伤害
+        _allTargetsDamage = new List<TargetDamageInfo>(); // 初始化所有目标的伤害信息列表
         _attackerName = attacker.Name; // 设置攻击者名称
         _attackSkillName = attackSlot.GetSkillName(); // 获取攻击技能名称
         _attackEngagedInShowdown = false; // 未进行拼点
@@ -2963,6 +3029,7 @@ public class BattleSystem
                 _attackLevel = actor.FinalAttackLevel;
                 _totalShieldDamage = 0; // 初始化累积护盾伤害
                 _totalHealthDamage = 0; // 初始化累积体力伤害
+                _allTargetsDamage = new List<TargetDamageInfo>(); // 初始化所有目标的伤害信息列表
                 _attackerName = actor.Name; // 设置攻击者名称
                 _attackSkillName = slot.GetSkillName(); // 获取攻击技能名称
                 _attackEngagedInShowdown = false; // 未进行拼点
@@ -3017,6 +3084,7 @@ public class BattleSystem
                 _attackLevel = actor.FinalAttackLevel;
                 _totalShieldDamage = 0; // 初始化累积护盾伤害
                 _totalHealthDamage = 0; // 初始化累积体力伤害
+                _allTargetsDamage = new List<TargetDamageInfo>(); // 初始化所有目标的伤害信息列表
                 _attackerName = actor.Name; // 设置攻击者名称
                 _attackSkillName = slot.GetSkillName(); // 获取攻击技能名称
                 _attackEngagedInShowdown = false; // 未进行拼点
@@ -3125,6 +3193,17 @@ public class BattleSystem
         // 获取结算后的护盾和血量
         int shieldAfter = GetCharacterShield(target);
         int healthAfter = target.CurrentHealth;
+        
+        // 记录主要目标的伤害信息
+        if (isDirectDamage && _allTargetsDamage != null)
+        {
+            // 检查是否已经记录过这个目标（避免次级目标重复记录）
+            bool alreadyRecorded = _allTargetsDamage.Any(tdi => tdi.Target == target);
+            if (!alreadyRecorded)
+            {
+                _allTargetsDamage.Add(new TargetDamageInfo(target, shieldDamage, healthDamage));
+            }
+        }
         
         // 如果有damageResult，设置护盾伤害和血量伤害
         if (damageResult != null)
@@ -3242,11 +3321,14 @@ public class BattleSystem
         var simaYiSkill = new TurnBasedRPG.Systems.SkillManagement.SimaYiSkill(this);
         // 获取攻击者
         Character langguAttacker = null;
-        if (_slotToCharacterMap != null && _slotToCharacterMap.ContainsKey(slot))
+        if (slot != null && _slotToCharacterMap != null && _slotToCharacterMap.ContainsKey(slot))
         {
             langguAttacker = _slotToCharacterMap[slot];
         }
-        simaYiSkill.HandleLangguTrigger(target, slot, isDirectDamage, shieldDamage, healthDamage, isShieldBroken, isLastCoinHit, _buffHandler, GetAllCharacters(), langguAttacker);
+        if (slot != null)
+        {
+            simaYiSkill.HandleLangguTrigger(target, slot, isDirectDamage, shieldDamage, healthDamage, isShieldBroken, isLastCoinHit, _buffHandler, GetAllCharacters(), langguAttacker);
+        }
         
         // 累积伤害，不在每次投掷时添加日志
         _totalShieldDamage += shieldDamage;
@@ -3461,7 +3543,9 @@ public class BattleSystem
 
     private void ResetBattleForNextRound()
     {
-        // 回合切换时清空战斗日志
+        // 回合切换时，将当前的BattleLog移动到PreviousBattleLog中，然后清空BattleLog
+        PreviousBattleLog.Clear();
+        PreviousBattleLog.AddRange(BattleLog);
         BattleLog.Clear();
         
         // 创建所有角色列表
@@ -3589,7 +3673,6 @@ public class BattleSystem
         _dodgeTriggeredThisRound = false;
         _resolutionStep = 0;
         _resolutionTimer = 0;
-        BattleLog.Clear();
         
         // 进入下回合，重置本回合统计数据
         Statistics.NextRound();
@@ -3645,9 +3728,10 @@ public class BattleSystem
         InitializeBattle(Players, Enemies);
     }
     
-    public void AddShield(Character character, int amount, string effectName = "", Character? attacker = null)
+    public void AddShield(Character character, int amount, string effectName = "", Character? attacker = null, bool addBattleLog = true)
     {
         string teamInfo = character.IsAlly ? "-我方" : "-敌方";
+        string attackerTeamInfo = attacker?.IsAlly == true ? "-我方" : "-敌方";
         
         if (!_characterShields.ContainsKey(character))
         {
@@ -3662,10 +3746,33 @@ public class BattleSystem
         _characterShields[character] += adjustedAmount;
         
         // 输出新格式的AddShield日志
-        string attackerTeamInfo = attacker?.IsAlly == true ? "-我方" : "-敌方";
         Game1.Log($"[AddShield]{character.Name}{teamInfo} 获得护盾，护盾基础值{amount}，护盾效果乘区{shieldMultiplier:F2}，实际获得护盾{adjustedAmount}");
         
-        BattleLog.Add($"{character.Name}获得{adjustedAmount}点护盾");
+        // 按照用户要求的格式添加战斗日志（仅当addBattleLog为true时）
+        if (addBattleLog)
+        {
+            if (attacker != null && !string.IsNullOrEmpty(effectName))
+            {
+                // 来自攻击者使用技能的情况
+                if (effectName.Contains("状态"))
+                {
+                    // 来源于状态效果的护盾
+                    BattleLog.Add($"{attacker.Name}{attackerTeamInfo} 的 {effectName} 为 {character.Name}{teamInfo} 施加了{adjustedAmount}点护盾");
+                }
+                else
+                {
+                    // 普通技能添加护盾（单个目标）
+                    BattleLog.Add($"{attacker.Name}{attackerTeamInfo} 使用 {effectName} 为 {character.Name}{teamInfo} 施加了{adjustedAmount}点护盾");
+                }
+                BattleLog.Add("");
+            }
+            else
+            {
+                // 没有攻击者信息或技能名的情况
+                BattleLog.Add($"{character.Name}{teamInfo} 获得了{adjustedAmount}点护盾");
+                BattleLog.Add("");
+            }
+        }
         
         // 记录护盾统计
         string skillName = string.IsNullOrEmpty(effectName) ? "护盾" : effectName;
@@ -3681,18 +3788,39 @@ public class BattleSystem
         // 输出施加护盾的日志
         string attackerTeamInfo = attacker.IsAlly ? "-我方" : "-敌方";
         List<string> targetNames = new List<string>();
+        List<Tuple<Character, int>> targetShieldAmounts = new List<Tuple<Character, int>>();
+        
+        // 首先计算每个目标实际获得的护盾值
         foreach (var target in targets)
         {
             string targetTeamInfo = target.IsAlly ? "-我方" : "-敌方";
             targetNames.Add($"{target.Name}{targetTeamInfo}");
+            
+            // 计算护盾值
+            float shieldMultiplier = 1 + target.ShieldAdjustment;
+            int adjustedAmount = (int)(amount * shieldMultiplier);
+            targetShieldAmounts.Add(Tuple.Create(target, adjustedAmount));
         }
-        string targetNamesStr = string.Join("/", targetNames);
+        string targetNamesStr = string.Join("，", targetNames);
         Game1.Log($"[AddShield]{attacker.Name}{attackerTeamInfo} 为 {targetNamesStr} 施加护盾");
         
-        // 逐个为目标添加护盾
+        // 添加多个目标的护盾日志
+        BattleLog.Add($"{attacker.Name}{attackerTeamInfo} 使用 {effectName} 为 {targetNamesStr} 施加了护盾");
+        
+        // 逐个添加每个目标获得的护盾
+        foreach (var item in targetShieldAmounts)
+        {
+            var target = item.Item1;
+            var adjustedAmount = item.Item2;
+            string targetTeamInfo = target.IsAlly ? "-我方" : "-敌方";
+            BattleLog.Add($"{target.Name}{targetTeamInfo} 获得了{adjustedAmount}点护盾");
+        }
+        BattleLog.Add("");
+        
+        // 逐个为目标添加护盾（不添加战斗日志，避免重复）
         foreach (var target in targets)
         {
-            AddShield(target, amount, effectName, attacker);
+            AddShield(target, amount, effectName, attacker, addBattleLog: false);
         }
     }
     
@@ -3774,6 +3902,12 @@ public class BattleSystem
     
     public void UpdateResolution(double deltaTime)
     {
+        // 如果战斗暂停，不更新
+        if (IsPaused)
+        {
+            return;
+        }
+        
         if (CurrentPhase == BattlePhase.Resolution)
         {
             try
@@ -3941,19 +4075,19 @@ public class BattleSystem
                             if (_attackSkillName == "镇岳反攻")
                             {
                                 // 找到攻击者
-                                Character attacker = null;
+                                Character zhenyueAttacker = null;
                                 foreach (var entry in _slotToCharacterMap)
                                 {
                                     if (entry.Key == _currentAttackSlot)
                                     {
-                                        attacker = entry.Value;
+                                        zhenyueAttacker = entry.Value;
                                         break;
                                     }
                                 }
                                 
-                                if (attacker != null)
+                                if (zhenyueAttacker != null)
                                 {
-                                    int attackerShield = GetCharacterShield(attacker);
+                                    int attackerShield = GetCharacterShield(zhenyueAttacker);
                                     
                                     // 计算额外伤害：自身剩余护盾值15%的真实伤害
                                     float extraDamageMultiplier = 0.15f;
@@ -3980,68 +4114,166 @@ public class BattleSystem
                             if (_attackSkillName == "煮酒论英" || _attackSkillName == "青釭开天" || _attackSkillName == "屯田固本" || _attackSkillName == "天下归心")
                             {
                                 // 找到攻击者
-                                Character attacker = null;
+                                Character caocaoAttacker = null;
                                 foreach (var entry in _slotToCharacterMap)
                                 {
                                     if (entry.Key == _currentAttackSlot)
                                     {
-                                        attacker = entry.Value;
+                                        caocaoAttacker = entry.Value;
                                         break;
                                     }
                                 }
                                 
-                                if (attacker != null && attacker is TurnBasedRPG.Characters.Allies.曹操)
+                                if (caocaoAttacker != null && caocaoAttacker is TurnBasedRPG.Characters.Allies.曹操)
                                 {
                                     var caoCaoSkill = new TurnBasedRPG.Systems.SkillManagement.CaoCaoSkill(this);
                                     int totalDamage = _totalShieldDamage + _totalHealthDamage;
                                     
                                     if (_attackSkillName == "煮酒论英")
                                     {
-                                        caoCaoSkill.HandleZhujiulunyingPostAttack(attacker, _currentTarget, totalDamage, _buffHandler);
+                                        caoCaoSkill.HandleZhujiulunyingPostAttack(caocaoAttacker, _currentTarget, totalDamage, _buffHandler);
                                     }
                                     else if (_attackSkillName == "青釭开天")
                                     {
-                                        caoCaoSkill.ProcessQinggangPostAttackEffects(attacker, new List<Character> { _currentTarget }, _buffHandler, GetAllCharacters(), this);
+                                        caoCaoSkill.ProcessQinggangPostAttackEffects(caocaoAttacker, new List<Character> { _currentTarget }, _buffHandler, GetAllCharacters(), this);
                                     }
                                     else if (_attackSkillName == "屯田固本")
                                     {
-                                        caoCaoSkill.HandleTuntianGubenPostAttack(attacker, _currentTarget, totalDamage, _buffHandler);
+                                        caoCaoSkill.HandleTuntianGubenPostAttack(caocaoAttacker, _currentTarget, totalDamage, _buffHandler);
                                     }
                                     else if (_attackSkillName == "天下归心")
                                     {
                                         // 天下归心需要消耗值，但暂时用总伤害代替
-                                        caoCaoSkill.HandleTianxiaguixinOnHit(attacker, totalDamage, _buffHandler);
+                                        caoCaoSkill.HandleTianxiaguixinOnHit(caocaoAttacker, totalDamage, _buffHandler);
                                     }
                                 }
                             }
                             
-                            // 构建日志消息
-                            string logMessage = $"{_attackerName}的{_attackSkillName}";
-                            if (_attackEngagedInShowdown)
+                            // 找到攻击者角色
+                            Character logAttacker = null;
+                            foreach (var entry in _slotToCharacterMap)
                             {
-                                logMessage += "拼点胜利";
+                                if (entry.Key == _currentAttackSlot)
+                                {
+                                    logAttacker = entry.Value;
+                                    break;
+                                }
                             }
                             
-                            // 无论伤害是否为0，都添加伤害统计信息
-                            if (_totalShieldDamage > 0 && _totalHealthDamage > 0)
+                            // 构建日志消息 - 按照用户要求的格式
+                            string attackerTeamInfo = logAttacker?.IsAlly == true ? "-我方" : "-敌方";
+                            string targetTeamInfo = _currentTarget.IsAlly ? "-我方" : "-敌方";
+                            
+                            // 如果有拼点，先添加拼点日志
+                            if (_attackEngagedInShowdown)
                             {
-                                logMessage += $",共造成{_totalShieldDamage}点护盾伤害,{_totalHealthDamage}点体力伤害";
+                                int moraleGain = 2 + Math.Max(0, 0); // 暂时简单计算
+                                BattleLog.Add($"{_attackerName}{attackerTeamInfo} 的 {_attackSkillName} 与 {_currentTarget.Name}{targetTeamInfo} 的 {_targetSkillName} 拼点胜利，恢复{moraleGain}点士气");
+                                BattleLog.Add("");
                             }
-                            else if (_totalShieldDamage > 0)
+                            
+                            // 添加攻击日志
+                            if (_allTargetsDamage != null && _allTargetsDamage.Count > 0)
                             {
-                                logMessage += $",共造成{_totalShieldDamage}点护盾伤害";
-                            }
-                            else if (_totalHealthDamage > 0)
-                            {
-                                logMessage += $",共造成{_totalHealthDamage}点体力伤害";
+                                if (_allTargetsDamage.Count == 1)
+                                {
+                                    // 单个目标的格式
+                                    var targetInfo = _allTargetsDamage[0];
+                                    string singleTargetTeamInfo = targetInfo.Target.IsAlly ? "-我方" : "-敌方";
+                                    
+                                    if (targetInfo.ShieldDamage > 0 || targetInfo.HealthDamage > 0)
+                                    {
+                                        string attackLog = $"{_attackerName}{attackerTeamInfo} 使用 {_attackSkillName} 对 {targetInfo.Target.Name}{singleTargetTeamInfo} 造成";
+                                        
+                                        if (targetInfo.ShieldDamage > 0 && targetInfo.HealthDamage > 0)
+                                        {
+                                            attackLog += $"{targetInfo.ShieldDamage}点护盾伤害与{targetInfo.HealthDamage}点体力伤害";
+                                        }
+                                        else if (targetInfo.ShieldDamage > 0)
+                                        {
+                                            attackLog += $"{targetInfo.ShieldDamage}点护盾伤害";
+                                        }
+                                        else
+                                        {
+                                            attackLog += $"{targetInfo.HealthDamage}点体力伤害";
+                                        }
+                                        BattleLog.Add(attackLog);
+                                    }
+                                    else
+                                    {
+                                        // 0伤害情况
+                                        BattleLog.Add($"{_attackerName}{attackerTeamInfo} 使用 {_attackSkillName} 对 {targetInfo.Target.Name}{singleTargetTeamInfo} 造成0点伤害");
+                                    }
+                                }
+                                else
+                                {
+                                    // 多个目标的格式（群攻/溅射）
+                                    List<string> targetNames = new List<string>();
+                                    foreach (var targetInfo in _allTargetsDamage)
+                                    {
+                                        string targetTeam = targetInfo.Target.IsAlly ? "-我方" : "-敌方";
+                                        targetNames.Add($"{targetInfo.Target.Name}{targetTeam}");
+                                    }
+                                    string targetNamesStr = string.Join("，", targetNames);
+                                    
+                                    BattleLog.Add($"{_attackerName}{attackerTeamInfo} 使用 {_attackSkillName} 攻击了 {targetNamesStr}");
+                                    
+                                    foreach (var targetInfo in _allTargetsDamage)
+                                    {
+                                        string targetTeam = targetInfo.Target.IsAlly ? "-我方" : "-敌方";
+                                        
+                                        if (targetInfo.ShieldDamage > 0 || targetInfo.HealthDamage > 0)
+                                        {
+                                            string targetLog = $"{targetInfo.Target.Name}{targetTeam} 受到 ";
+                                            
+                                            if (targetInfo.ShieldDamage > 0 && targetInfo.HealthDamage > 0)
+                                            {
+                                                targetLog += $"{targetInfo.ShieldDamage}点护盾伤害与{targetInfo.HealthDamage}点体力伤害";
+                                            }
+                                            else if (targetInfo.ShieldDamage > 0)
+                                            {
+                                                targetLog += $"{targetInfo.ShieldDamage}点护盾伤害";
+                                            }
+                                            else
+                                            {
+                                                targetLog += $"{targetInfo.HealthDamage}点体力伤害";
+                                            }
+                                            BattleLog.Add(targetLog);
+                                        }
+                                        else
+                                        {
+                                            BattleLog.Add($"{targetInfo.Target.Name}{targetTeam} 受到 0点伤害");
+                                        }
+                                    }
+                                }
                             }
                             else
                             {
-                                // 即使伤害为0，也显示造成0点伤害
-                                logMessage += $",共造成0点伤害";
+                                // 回退到旧的单个目标格式
+                                if (_totalShieldDamage > 0 || _totalHealthDamage > 0)
+                                {
+                                    string attackLog = $"{_attackerName}{attackerTeamInfo} 使用 {_attackSkillName} 对 {_currentTarget.Name}{targetTeamInfo} 造成";
+                                    
+                                    if (_totalShieldDamage > 0 && _totalHealthDamage > 0)
+                                    {
+                                        attackLog += $"{_totalShieldDamage}点护盾伤害与{_totalHealthDamage}点体力伤害";
+                                    }
+                                    else if (_totalShieldDamage > 0)
+                                    {
+                                        attackLog += $"{_totalShieldDamage}点护盾伤害";
+                                    }
+                                    else
+                                    {
+                                        attackLog += $"{_totalHealthDamage}点体力伤害";
+                                    }
+                                    BattleLog.Add(attackLog);
+                                }
+                                else
+                                {
+                                    BattleLog.Add($"{_attackerName}{attackerTeamInfo} 使用 {_attackSkillName} 对 {_currentTarget.Name}{targetTeamInfo} 造成0点伤害");
+                                }
                             }
-                            
-                            BattleLog.Add(logMessage);
+                            BattleLog.Add("");
                             
                             // 标记攻击槽为已完成（而非销毁），保留技能图标和核心信息
                             if (_currentAttackSlot != null)
@@ -4049,22 +4281,22 @@ public class BattleSystem
                                 _currentAttackSlot.IsCompleted = true;
                                 
                                 // 处理夏侯惇的特殊技能效果
-                                Character attacker = null;
+                                Character xiahoudunAttacker = null;
                                 foreach (var entry in _slotToCharacterMap)
                                 {
                                     if (entry.Key == _currentAttackSlot)
                                     {
-                                        attacker = entry.Value;
+                                        xiahoudunAttacker = entry.Value;
                                         break;
                                     }
                                 }
                                 
-                                if (attacker is 夏侯惇)
+                                if (xiahoudunAttacker is 夏侯惇)
                                 {
                                     // 处理攻击技能3的特殊效果：攻击结束后对自身施加1回合沉默
                                     if (_currentAttackSlot.GetSkillName() == "铁壁战吼")
                                     {
-                                        ((夏侯惇)attacker).HandleAttackSkill3SilenceEffect(_buffHandler);
+                                        ((夏侯惇)xiahoudunAttacker).HandleAttackSkill3SilenceEffect(_buffHandler);
                                     }
                                 }
                                 
@@ -4092,21 +4324,21 @@ public class BattleSystem
                             if (_currentAttackSlot != null && _currentTarget != null && _originalCoins != null && _rerolledCoins != null && _currentCoinIndex < _originalCoins.Length)
                             {
                                 // 找到攻击者角色
-                                Character attacker = null;
+                                Character rerollAttacker = null;
                                 foreach (var entry in _slotToCharacterMap)
                                 {
                                     if (entry.Key == _currentAttackSlot)
                                     {
-                                        attacker = entry.Value;
+                                        rerollAttacker = entry.Value;
                                         break;
                                     }
                                 }
                                 
                                 // 检查是否有神威状态
                                 bool hasShenWei = false;
-                                if (attacker != null)
+                                if (rerollAttacker != null)
                                 {
-                                    hasShenWei = _buffHandler.CheckBuff<TurnBasedRPG.Buffs.Buff.神威>(attacker);
+                                    hasShenWei = _buffHandler.CheckBuff<TurnBasedRPG.Buffs.Buff.神威>(rerollAttacker);
                                 }
                                 
                                 // 重投当前硬币
@@ -4195,21 +4427,27 @@ public class BattleSystem
                                 
                                 // 根据攻击对抗类型和技能类型计算skillLevelMultiplier（攻防等级修正乘区）
                                 double skillLevelMultiplier;
-                                double multiplierRate = 0.03; // 默认倍率：3%
+                                double multiplierRate = 0.03; // 默认倍率：3%（常规攻击技能）
                             
-                                // 检查是否是反击技能或默守蓄锋（使用4.5%倍率）
+                                // 检查是否是反击技能或默守蓄锋（用于后续代码）
                                 bool isCounterSkill = _currentAttackSlot != null && 
                                     (_currentAttackSlot.Type == ActionType.Counter || 
-                                     _attackSkillName == "默守蓄锋");
-                                if (isCounterSkill)
+                                     (_currentAttackSlot.Skill != null && _currentAttackSlot.Skill.IsSpecialCounterSkill));
+                            
+                                // 检查是否是反击技能或特殊反击（使用4.5%倍率）
+                                bool isCounterOrSpecialSkill = _currentAttackSlot != null && 
+                                    (_currentAttackSlot.Type == ActionType.Counter || 
+                                     (_currentAttackSlot.Skill != null && _currentAttackSlot.Skill.IsSpecialCounterSkill));
+                            
+                                if (isCounterOrSpecialSkill)
                                 {
-                                    multiplierRate = 0.045; // 反击技能和默守蓄锋4.5%
+                                    multiplierRate = 0.045; // 反击技能和特殊反击4.5%
                                 }
                                 
                                 // 无论是否对抗防御技能，都使用目标的防御等级进行计算
                                 int targetLevelForCalculation = _currentTarget.FinalDefenseLevel;
                                 int levelDifference = skillLevel - targetLevelForCalculation;
-                                skillLevelMultiplier = 1.0 + ((double)levelDifference * multiplierRate);
+                                skillLevelMultiplier = 1.5 + ((double)levelDifference * multiplierRate);
                                 
                                 // skillLevelMultiplier的计算结果不低于0.2
                                 skillLevelMultiplier = Math.Max(0.2, skillLevelMultiplier);
@@ -4576,8 +4814,32 @@ public class BattleSystem
                                             if (secondaryTarget != null && !secondaryTarget.ShouldDie())
                                             {
                                                 string secondaryTargetTeamInfo = secondaryTarget.IsAlly ? "-我方" : "-敌方";
-                                                ApplyDamage(secondaryDamage, secondaryTarget, _currentAttackSlot, isDirectDamage: false, isLastCoinHit: isLastCoinHit);
-                                                BattleLog.Add($"{_attackSkillName}对次级目标{secondaryTarget.Name}{secondaryTargetTeamInfo}造成{secondaryDamage}点伤害");
+                                                
+                                                // 记录次级目标的伤害信息（在ApplyDamage之前记录，这样可以在ApplyDamage中避免重复）
+                                                if (_allTargetsDamage != null)
+                                                {
+                                                    // 先记录次级目标，然后在ApplyDamage中跳过（因为我们已经手动记录了）
+                                                    // 先保存ApplyDamage之前的护盾和血量
+                                                    int shieldBeforeSecondary = GetCharacterShield(secondaryTarget);
+                                                    int healthBeforeSecondary = secondaryTarget.CurrentHealth;
+                                                    
+                                                    // 应用伤害
+                                                    ApplyDamage(secondaryDamage, secondaryTarget, _currentAttackSlot, isDirectDamage: false, isLastCoinHit: isLastCoinHit);
+                                                    
+                                                    // 计算实际造成的伤害
+                                                    int shieldAfterSecondary = GetCharacterShield(secondaryTarget);
+                                                    int healthAfterSecondary = secondaryTarget.CurrentHealth;
+                                                    int shieldDamageSecondary = shieldBeforeSecondary - shieldAfterSecondary;
+                                                    int healthDamageSecondary = healthBeforeSecondary - healthAfterSecondary;
+                                                    
+                                                    // 手动记录次级目标的伤害（避免ApplyDamage中重复记录）
+                                                    _allTargetsDamage.Add(new TargetDamageInfo(secondaryTarget, shieldDamageSecondary, healthDamageSecondary));
+                                                }
+                                                else
+                                                {
+                                                    // 如果_allTargetsDamage为null，则正常调用
+                                                    ApplyDamage(secondaryDamage, secondaryTarget, _currentAttackSlot, isDirectDamage: false, isLastCoinHit: isLastCoinHit);
+                                                }
                                             }
                                         }
                                     }
@@ -5061,6 +5323,253 @@ public class BattleSystem
             
             BattleLog.Add($"窃国者侯将{target.Name}的{selectedBuff.Name}状态转移给了{attacker.Name}");
         }
+    }
+    
+    /// <summary>
+    /// 计算单个目标的伤害（包括所有乘区）
+    /// </summary>
+    /// <param name="attacker">攻击者</param>
+    /// <param name="target">目标</param>
+    /// <param name="baseValue">基础伤害值</param>
+    /// <param name="skill">技能对象</param>
+    /// <param name="skillLevelMultiplierOverride">可选的攻防等级修正乘区覆盖</param>
+    /// <param name="damageMultiplierOverride">可选的一类增伤乘区覆盖</param>
+    /// <param name="finalDamageMultiplierOverride">可选的最终伤害乘区覆盖</param>
+    /// <returns>目标的伤害信息</returns>
+    public TargetDamageInfo CalculateDamageForTarget(Character attacker, Character target, int baseValue, 
+        BaseSkill skill, double? skillLevelMultiplierOverride = null, 
+        float? damageMultiplierOverride = null, float? finalDamageMultiplierOverride = null)
+    {
+        int shieldBefore = GetCharacterShield(target);
+        int healthBefore = target.CurrentHealth;
+        
+        // 1. 攻防等级修正乘区
+        double skillLevelMultiplier;
+        if (skillLevelMultiplierOverride.HasValue)
+        {
+            skillLevelMultiplier = skillLevelMultiplierOverride.Value;
+        }
+        else
+        {
+            // 确定攻防等级
+            int skillLevel = (skill.ActionType == ActionType.Counter || skill.Name == "默守蓄锋") 
+                ? attacker.FinalDefenseLevel 
+                : attacker.FinalAttackLevel;
+            
+            // 计算skillLevelMultiplier（攻防等级修正乘区）
+            double multiplierRate = 0.03; // 默认倍率：3%（常规攻击技能）
+            
+            // 检查是否是反击技能或特殊反击（使用4.5%倍率）
+            bool isCounterOrSpecialSkill = skill.ActionType == ActionType.Counter || 
+                skill.IsSpecialCounterSkill;
+            
+            if (isCounterOrSpecialSkill)
+            {
+                multiplierRate = 0.045; // 反击技能和特殊反击4.5%
+            }
+            
+            int targetLevelForCalculation = target.FinalDefenseLevel;
+            int levelDifference = skillLevel - targetLevelForCalculation;
+            skillLevelMultiplier = 1.5 + ((double)levelDifference * multiplierRate);
+            skillLevelMultiplier = Math.Max(0.2, skillLevelMultiplier);
+        }
+        
+        // 2. 一类增伤乘区
+        float damageMultiplier;
+        if (damageMultiplierOverride.HasValue)
+        {
+            damageMultiplier = damageMultiplierOverride.Value;
+        }
+        else
+        {
+            damageMultiplier = (1 + attacker.DamageIncrease - target.DamageReduction);
+            damageMultiplier = Math.Max(0.2f, damageMultiplier);
+        }
+        
+        // 3. 伤害种类抗性
+        float damageTypeResistance = 1.0f;
+        switch (skill.DamageType)
+        {
+            case DamageType.Physical:
+                damageTypeResistance = target.PhysicalVulnerability;
+                break;
+            case DamageType.Magic:
+                damageTypeResistance = target.MagicVulnerability;
+                break;
+            case DamageType.True:
+                damageTypeResistance = target.TrueVulnerability;
+                break;
+        }
+        
+        // 4. 攻击方式抗性
+        float attackTypeResistance = 1.0f;
+        switch (skill.AttackType)
+        {
+            case AttackType.Slash:
+                attackTypeResistance = target.SlashVulnerability;
+                break;
+            case AttackType.Blunt:
+                attackTypeResistance = target.BluntVulnerability;
+                break;
+            case AttackType.Pierce:
+                attackTypeResistance = target.PierceVulnerability;
+                break;
+            case AttackType.Spell:
+                attackTypeResistance = target.SpellVulnerability;
+                break;
+        }
+        
+        // 确保抗性值不低于0.1
+        damageTypeResistance = Math.Max(0.1f, damageTypeResistance);
+        attackTypeResistance = Math.Max(0.1f, attackTypeResistance);
+        
+        // 5. 最终伤害乘区
+        float finalDamageMultiplier;
+        if (finalDamageMultiplierOverride.HasValue)
+        {
+            finalDamageMultiplier = finalDamageMultiplierOverride.Value;
+        }
+        else
+        {
+            finalDamageMultiplier = (1 + attacker.FinalDamageIncrease - target.FinalDamageReduction);
+        }
+        
+        // 6. 暴击判定
+        bool isCriticalHit = false;
+        float critDamageMultiplier = 1.0f;
+        
+        // 计算暴击概率
+        float skillCritRate = skill.CritRate;
+        float targetCritResistance = target.CritResistance;
+        float firstStepCritRate = Math.Max(0, skillCritRate - targetCritResistance);
+        float finalCritRateStep = skill.FinalCritRate - target.FinalCritResistance;
+        float totalCritRate = Math.Max(0, firstStepCritRate + finalCritRateStep);
+        totalCritRate = Math.Min(totalCritRate, 1.0f); // 超出100%视为100%
+        
+        // 按概率判定是否暴击
+        Random random = new Random();
+        double randomValue = random.NextDouble();
+        if (randomValue < totalCritRate)
+        {
+            isCriticalHit = true;
+        }
+        
+        // 计算暴击伤害乘区
+        if (isCriticalHit)
+        {
+            float skillCritDamage = skill.CritDamage;
+            float targetCritDamageResistance = target.CritDamageResistance;
+            critDamageMultiplier = 1 + (skillCritDamage - targetCritDamageResistance);
+            critDamageMultiplier = Math.Max(1.0f, critDamageMultiplier); // 不低于1
+        }
+        
+        // 计算最终伤害
+        int damage = (int)(baseValue * skillLevelMultiplier * damageMultiplier * finalDamageMultiplier * 
+            attackTypeResistance * damageTypeResistance * critDamageMultiplier);
+        
+        // 应用伤害
+        ApplyDamage(damage, target, null, isDirectDamage: false);
+        
+        // 计算实际造成的伤害
+        int shieldAfter = GetCharacterShield(target);
+        int healthAfter = target.CurrentHealth;
+        int shieldDamage = shieldBefore - shieldAfter;
+        int healthDamage = healthBefore - healthAfter;
+        
+        return new TargetDamageInfo(target, shieldDamage, healthDamage);
+    }
+    
+    /// <summary>
+    /// 处理群攻伤害（对所有敌方单位造成相同伤害）
+    /// </summary>
+    /// <param name="attacker">攻击者</param>
+    /// <param name="baseValue">基础伤害值</param>
+    /// <param name="skill">技能对象</param>
+    /// <param name="recordToAllTargetsDamage">是否记录到_allTargetsDamage列表</param>
+    /// <returns>所有目标的伤害信息列表</returns>
+    public List<TargetDamageInfo> ProcessAreaAttack(Character attacker, int baseValue, 
+        BaseSkill skill, bool recordToAllTargetsDamage = true)
+    {
+        List<TargetDamageInfo> results = new List<TargetDamageInfo>();
+        
+        // 获取所有敌方单位
+        List<Character> enemies = new List<Character>();
+        if (attacker.IsAlly)
+        {
+            enemies.AddRange(Enemies);
+        }
+        else
+        {
+            enemies.AddRange(Players);
+        }
+        
+        // 对每个存活且可被选中的敌方单位应用伤害
+        foreach (var target in enemies)
+        {
+            if (target.CurrentHealth > 0)
+            {
+                var damageInfo = CalculateDamageForTarget(attacker, target, baseValue, skill);
+                results.Add(damageInfo);
+                
+                // 记录到_allTargetsDamage列表
+                if (recordToAllTargetsDamage && _allTargetsDamage != null)
+                {
+                    _allTargetsDamage.Add(damageInfo);
+                }
+            }
+        }
+        
+        return results;
+    }
+    
+    /// <summary>
+    /// 处理溅射伤害（对主目标造成全额伤害，对次级目标造成较低伤害）
+    /// </summary>
+    /// <param name="attacker">攻击者</param>
+    /// <param name="mainTarget">主要目标</param>
+    /// <param name="secondaryTargets">次级目标列表</param>
+    /// <param name="mainBaseValue">主要目标基础伤害值</param>
+    /// <param name="secondaryBaseValue">次级目标基础伤害值</param>
+    /// <param name="skill">技能对象</param>
+    /// <param name="recordToAllTargetsDamage">是否记录到_allTargetsDamage列表</param>
+    /// <returns>所有目标的伤害信息列表</returns>
+    public List<TargetDamageInfo> ProcessSplashAttack(Character attacker, Character mainTarget, 
+        List<Character> secondaryTargets, int mainBaseValue, int secondaryBaseValue, 
+        BaseSkill skill, bool recordToAllTargetsDamage = true)
+    {
+        List<TargetDamageInfo> results = new List<TargetDamageInfo>();
+        
+        // 对主要目标造成全额伤害
+        if (mainTarget != null && mainTarget.CurrentHealth > 0)
+        {
+            var mainDamageInfo = CalculateDamageForTarget(attacker, mainTarget, mainBaseValue, skill);
+            results.Add(mainDamageInfo);
+            
+            if (recordToAllTargetsDamage && _allTargetsDamage != null)
+            {
+                _allTargetsDamage.Add(mainDamageInfo);
+            }
+        }
+        
+        // 对次级目标造成较低伤害
+        if (secondaryTargets != null && secondaryTargets.Count > 0)
+        {
+            foreach (var secondaryTarget in secondaryTargets)
+            {
+                if (secondaryTarget != null && secondaryTarget.CurrentHealth > 0)
+                {
+                    var secondaryDamageInfo = CalculateDamageForTarget(attacker, secondaryTarget, secondaryBaseValue, skill);
+                    results.Add(secondaryDamageInfo);
+                    
+                    if (recordToAllTargetsDamage && _allTargetsDamage != null)
+                    {
+                        _allTargetsDamage.Add(secondaryDamageInfo);
+                    }
+                }
+            }
+        }
+        
+        return results;
     }
     
     /// <summary>

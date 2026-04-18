@@ -12,7 +12,7 @@ public class 魏室初锋 : BaseSkill
         CoinEffectiveness = 6.0f;
         AttackLevelModifier = 0;
         Level = 1;
-        ExtraEffects = "[回合开始时]获得1级[嗣业承祚]\n[攻击后]额外造成相当于（防御等级/6，不低于1）的真实伤害，此附加伤害暴击率固定为50%\n若附加伤害产生了暴击，额外获得1级[嗣业承祚]";
+        ExtraEffects = "[回合开始时]获得1级[嗣业承祚]强度\n[攻击后]额外造成相当于（防御等级/6，不低于1）的真实伤害，此附加伤害暴击率固定为50%\n若附加伤害产生了暴击，额外获得1级[嗣业承祚]";
     }
     
     public override void CalculateValues(int attackLevel, int defenseLevel, int morale = 0)

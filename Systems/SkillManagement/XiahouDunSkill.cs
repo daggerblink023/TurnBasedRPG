@@ -27,7 +27,7 @@ public class XiahouDunSkill : BattleSystem
         }
     }
     
-    // 魏武固阵的具体实现方法
+    // 榄忔固阵鐨勫叿浣撳疄鐜版柟娉?
     public void HandleXiahouDunSkillEffects(Character xiahouDun, ActionSlot slot, Character target, BuffHandler buffHandler, List<Character> allCharacters)
     {
         if (xiahouDun == null || slot == null || target == null)
@@ -35,21 +35,21 @@ public class XiahouDunSkill : BattleSystem
             return;
         }
         
-        // 处理横斩技能命中时的效果：使目标获得2级[脆弱]，持续2回合
+        // 澶勭悊横斩鎶€鑳藉懡涓椂鐨勬晥鏋滐細浣跨洰鏍囪幏寰?绾脆弱]锛屾寔缁?鍥炲悎
         if (slot.SkillName == "横斩")
         {
             buffHandler.AddBuff(target, new 脆弱(2, 2));
-            BattleLog.Add($"横斩使{target.Name}获得2级脆弱，持续2回合");
+
         }
         
-        // 处理御甲鸣镝技能攻击后效果：使主要目标与所有次级目标获得[围城]，持续2回合
+        // 澶勭悊御甲鸣镝鎶€鑳芥敾鍑诲悗鏁堟灉锛氫娇涓昏鐩爣涓庢墍鏈夋绾х洰鏍囪幏寰梉围城]锛屾寔缁?鍥炲悎
         if (slot.SkillName == "御甲鸣镝" && slot.IsLastCoin)
         {
-            // 给主要目标添加围城状态
+            // 缁欎富瑕佺洰鏍囨坊鍔犲洿鍩庣姸鎬?
             buffHandler.AddBuff(target, new 围城(2, 1));
-            BattleLog.Add($"御甲鸣镝使{target.Name}获得围城，持续2回合");
+
             
-            // 给次级目标添加围城状态
+            // 缁欐绾х洰鏍囨坊鍔犲洿鍩庣姸鎬?
             List<Character> secondaryTargets = GetSecondaryTargets(xiahouDun, target);
             if (secondaryTargets != null && secondaryTargets.Count > 0)
             {
@@ -58,53 +58,52 @@ public class XiahouDunSkill : BattleSystem
                     if (secondaryTarget != null && !secondaryTarget.ShouldDie())
                     {
                         buffHandler.AddBuff(secondaryTarget, new 围城(2, 1));
-                        BattleLog.Add($"御甲鸣镝使{secondaryTarget.Name}获得围城，持续2回合");
+
                     }
                 }
             }
         }
         
-        // 处理铁壁战吼技能最后一枚硬币命中时的效果
-        if (slot.SkillName == "铁壁战吼" && slot.IsLastCoin)
+        // 澶勭悊铁壁战吼鎶€鑳芥渶鍚庝竴鏋氱‖甯佸懡涓椂鐨勬晥鏋?        if (slot.SkillName == "铁壁战吼" && slot.IsLastCoin)
         {
-            // 计算额外伤害（25%的真实伤害）
+            // 璁＄畻棰濆浼ゅ锛?5%鐨勭湡瀹炰激瀹筹級
             int additionalDamage = (int)(slot.TotalDamage * 0.25f);
             
-            // 找到敌方随机目标
+            // 鎵惧埌鏁屾柟闅忔満鐩爣
             List<Character> enemies = new List<Character>();
             if (target.IsAlly)
             {
-                // 如果目标是己方，那么敌方是Enemies
+                // 濡傛灉鐩爣鏄繁鏂癸紝閭ｄ箞鏁屾柟鏄疎nemies
                 enemies.AddRange(Enemies);
             }
             else
             {
-                // 如果目标是敌方，那么敌方是Players
+                // 濡傛灉鐩爣鏄晫鏂癸紝閭ｄ箞鏁屾柟鏄疨layers
                 enemies.AddRange(Players);
             }
             
-            // 排除当前目标
+            // 鎺掗櫎褰撳墠鐩爣
             enemies.Remove(target);
             
             if (enemies.Count > 0)
             {
-                // 随机选择一个敌方目标
+                // 闅忔満閫夋嫨涓€涓晫鏂圭洰鏍?
                 Random randomEnemySelector = new Random();
                 Character randomEnemy = enemies[randomEnemySelector.Next(enemies.Count)];
                 
-                // 对随机目标造成额外伤害
+                // 瀵归殢鏈虹洰鏍囬€犳垚棰濆浼ゅ
                 if (additionalDamage > 0)
                 {
-                    // 使用ApplyDamage方法处理真实伤害
+                    // 浣跨敤ApplyDamage鏂规硶澶勭悊鐪熷疄浼ゅ
                     ApplyDamage(additionalDamage, randomEnemy, slot, isDirectDamage: true);
-                    BattleLog.Add($"铁壁战吼对{randomEnemy.Name}造成{additionalDamage}点真实伤害");
+
                 }
                 
-                // 使自身获得等同于该次额外伤害200%的护盾值
+                // 浣胯嚜韬幏寰楃瓑鍚屼簬璇ユ棰濆浼ゅ200%鐨勬姢鐩惧€?
                 int shieldAmount = (int)(additionalDamage * 2.0f);
                 if (shieldAmount > 0)
                 {
-                    // 找到攻击者
+                    // 鎵惧埌鏀诲嚮鑰?
                     Character tiebiAttacker = xiahouDun;
                     
                     if (tiebiAttacker != null)
@@ -113,24 +112,23 @@ public class XiahouDunSkill : BattleSystem
                     }
                 }
                 
-                // 使主要目标与附加伤害命中的目标获得3级[虚弱]，持续2回合
+                // 浣夸富瑕佺洰鏍囦笌闄勫姞浼ゅ鍛戒腑鐨勭洰鏍囪幏寰?绾虚弱]锛屾寔缁?鍥炲悎
                 buffHandler.AddBuff(target, new 虚弱(2, 3));
                 if (randomEnemy != null)
                 {
                     buffHandler.AddBuff(randomEnemy, new 虚弱(2, 3));
                 }
-                BattleLog.Add($"铁壁战吼使{target.Name}和{randomEnemy?.Name ?? "随机目标"}获得3级虚弱，持续2回合");
+
             }
         }
         
-        // 处理窃国者侯技能攻击后效果：使所有目标获得2级[虚弱]，持续2回合
+        // 澶勭悊窃国者侯鎶€鑳芥敾鍑诲悗鏁堟灉锛氫娇鎵€鏈夌洰鏍囪幏寰?绾虚弱]锛屾寔缁?鍥炲悎
         if (slot.SkillName == "窃国者侯" && slot.IsLastCoin)
         {
-            // 给主要目标添加虚弱状态
-            buffHandler.AddBuff(target, new 虚弱(2, 2));
-            BattleLog.Add($"窃国者侯使{target.Name}获得2级虚弱，持续2回合");
+            // 缁欎富瑕佺洰鏍囨坊鍔犺櫄寮辩姸鎬?            buffHandler.AddBuff(target, new 虚弱(2, 2));
+
             
-            // 给次级目标添加虚弱状态
+            // 缁欐绾х洰鏍囨坊鍔犺櫄寮辩姸鎬?
             List<Character> secondaryTargets = GetSecondaryTargets(xiahouDun, target);
             if (secondaryTargets != null && secondaryTargets.Count > 0)
             {
@@ -139,7 +137,7 @@ public class XiahouDunSkill : BattleSystem
                     if (secondaryTarget != null && !secondaryTarget.ShouldDie())
                     {
                         buffHandler.AddBuff(secondaryTarget, new 虚弱(2, 2));
-                        BattleLog.Add($"窃国者侯使{secondaryTarget.Name}获得2级虚弱，持续2回合");
+
                     }
                 }
             }
@@ -150,8 +148,8 @@ public class XiahouDunSkill : BattleSystem
     {
         List<Character> secondaryTargets = new List<Character>();
         
-        // 这里可以根据游戏规则实现获取次级目标的逻辑
-        // 例如，获取除主要目标外的其他敌方单位
+        // 杩欓噷鍙互鏍规嵁娓告垙瑙勫垯瀹炵幇鑾峰彇娆＄骇鐩爣鐨勯€昏緫
+        // 渚嬪锛岃幏鍙栭櫎涓昏鐩爣澶栫殑鍏朵粬鏁屾柟鍗曚綅
         
         List<Character> enemies = new List<Character>();
         if (attacker.IsAlly)

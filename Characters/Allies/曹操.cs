@@ -1,4 +1,4 @@
-using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using TurnBasedRPG.Characters;
@@ -130,13 +130,13 @@ public class 曹操 : Character
         UpdateBuffs(buffHandler);
 
         // 回合开始时，为敌方全体施加1级持续1回合的罪己诏
-        Game1.Log($"[曹操-回合开始] 开始为敌方全体施加罪己诏");
+
         foreach (var enemy in allCharacters)
         {
             if (enemy.IsAlly != this.IsAlly && enemy.CurrentHealth > 0)
             {
                 buffHandler.AddBuff(enemy, new 罪己诏(1, 1));
-                Game1.Log($"[曹操-回合开始] 为{enemy.Name}施加了1级罪己诏");
+
             }
         }
 
@@ -153,7 +153,7 @@ public class 曹操 : Character
         if (playerSlots == null || playerSlots.Count == 0)
             return;
 
-        Game1.Log($"[曹操-处理技能额外效果] 开始处理技能额外效果");
+
 
         // 查找曹操的行动槽并处理技能
         foreach (var slot in playerSlots)
@@ -171,7 +171,7 @@ public class 曹操 : Character
                 if (badaoBuff != null)
                 {
                     badaoBuff.Strength = Math.Min(badaoBuff.Strength + 1, 8);
-                    Game1.Log($"[曹操-霸道] 使用技能，霸道强度增加至{badaoBuff.Strength}");
+
                 }
             }
         }
@@ -191,14 +191,14 @@ public class 曹操 : Character
                 }
             }
 
-            Game1.Log($"[曹操-回合结束] 被额外丢弃的技能最高等级={highestSkillLevel}");
+
 
             var existingBuff = buffHandler.GetBuffs(this).Find(b => b is 决断_曹操);
             if (existingBuff is 决断_曹操)
             {
                 // 曹操自己的决断-曹操，最小层数+1（2），最大层数+1（4），强度+1
                 existingBuff.Strength = Math.Clamp(highestSkillLevel + 1, 2, 4);
-                Game1.Log($"[曹操-回合结束] 决断-曹操状态强度设置为={existingBuff.Strength}");
+
             }
         }
     }

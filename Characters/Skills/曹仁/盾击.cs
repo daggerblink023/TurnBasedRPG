@@ -12,7 +12,7 @@ public class 盾击 : BaseSkill
         CoinEffectiveness = 6.0f;
         AttackLevelModifier = 0;
         Level = 1;
-        ExtraEffects = "[命中时]使自身与同队其余魏国武将获得技能最终点数100%或生命上限7.5%的护盾（取较小值）";
+        ExtraEffects = "[命中时]使全队所有魏国武将获得伤害量50%的护盾";
     }
     
     public override void CalculateValues(int attackLevel, int defenseLevel, int morale = 0)

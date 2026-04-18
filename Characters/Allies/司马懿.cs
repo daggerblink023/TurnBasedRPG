@@ -1,4 +1,4 @@
-using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using TurnBasedRPG.Characters;
@@ -133,7 +133,6 @@ public class 司马懿 : Character
         {
             int extraCount = taohuiBuff.Strength / 3;
             _langguMaxTriggerCount += extraCount;
-            Game1.Log($"[司马懿-狼顾] 计算最大触发次数：初始2次 + 韬晦强度{taohuiBuff.Strength}/3={extraCount}次 = 总共{_langguMaxTriggerCount}次");
         }
     }
     
@@ -178,8 +177,6 @@ public class 司马懿 : Character
         if (playerSlots == null || playerSlots.Count == 0)
             return;
             
-        Game1.Log($"[司马懿-处理技能额外效果] 开始处理技能额外效果");
-        
         // 查找司马懿的行动槽并处理技能
         foreach (var slot in playerSlots)
         {
@@ -195,34 +192,28 @@ public class 司马懿 : Character
                 // 处理机先技能：[回合开始时]获得1级[韬晦]
                 if (slot.SkillName == "机先")
                 {
-                    Game1.Log($"[司马懿-机先] 处理机先技能额外效果，获得1级韬晦");
                     var taohuiBuff = _buffHandler?.GetBuffs(this).Find(b => b is 韬晦);
                     if (taohuiBuff != null)
                     {
                         taohuiBuff.Strength = Math.Min(taohuiBuff.Strength + 1, 9); // 韬晦上限9
-                        Game1.Log($"[司马懿-机先] 韬晦强度增加至{taohuiBuff.Strength}");
                     }
                 }
                 // 处理汲魂技能：[回合开始时]获得1级[韬晦]
                 else if (slot.SkillName == "汲魂")
                 {
-                    Game1.Log($"[司马懿-汲魂] 处理汲魂技能额外效果，获得1级韬晦");
                     var taohuiBuff = _buffHandler?.GetBuffs(this).Find(b => b is 韬晦);
                     if (taohuiBuff != null)
                     {
                         taohuiBuff.Strength = Math.Min(taohuiBuff.Strength + 1, 9); // 韬晦上限9
-                        Game1.Log($"[司马懿-汲魂] 韬晦强度增加至{taohuiBuff.Strength}");
                     }
                 }
                 // 处理窃国者侯技能：[回合开始时]获得3级[韬晦]
                 else if (slot.SkillName == "窃国者侯")
                 {
-                    Game1.Log($"[司马懿-窃国者侯] 处理窃国者侯技能额外效果，获得3级韬晦");
                     var taohuiBuff = _buffHandler?.GetBuffs(this).Find(b => b is 韬晦);
                     if (taohuiBuff != null)
                     {
                         taohuiBuff.Strength = Math.Min(taohuiBuff.Strength + 3, 9); // 韬晦上限9
-                        Game1.Log($"[司马懿-窃国者侯] 韬晦强度增加至{taohuiBuff.Strength}");
                     }
                 }
             }
@@ -247,8 +238,6 @@ public class 司马懿 : Character
                     highestSkillLevel = skillLevel;
                 }
             }
-            
-            Game1.Log($"[司马懿-回合结束] 被额外丢弃的技能最高等级={highestSkillLevel}");
             
             // 检查同队是否有曹操的决断-曹操buff
             bool hasCaoCaoJueDuan = false;
@@ -281,42 +270,33 @@ public class 司马懿 : Character
                     // 没有曹操的决断-曹操，正常设置
                     existingBuff.Strength = Math.Clamp(highestSkillLevel, 1, 3);
                 }
-                Game1.Log($"[司马懿-回合结束] 决断-司马懿状态强度设置为={existingBuff.Strength}");
             }
         }
     }
     
     public bool CanTriggerLanggu(Character attacker, bool isEnemyAttack, bool isCounterSkill, bool isSelfHit, bool isShieldBroken, bool isSelfSkillHit, bool isLastCoinHit = false)
     {
-        string teamInfo = IsAlly ? "-我方" : "-敌方";
-        Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}开始判定狼顾触发条件，当前触发次数={_langguTriggerCount}/{_langguMaxTriggerCount}");
-        
         if (_langguTriggerCount >= _langguMaxTriggerCount)
         {
-            Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}触发次数已达{_langguMaxTriggerCount}次上限，跳过");
             return false;
         }
         
         // 检查attacker是否为null
         if (attacker == null)
         {
-            Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}攻击者为null，跳过");
             return false;
         }
         
         bool shouldTrigger = false;
-        string attackerTeamInfo = attacker.IsAlly ? "-我方" : "-敌方";
         
         // 条件1：自身被敌方的非反击技能的最后一枚硬币命中时：每个敌方单位每回合至多触发1次
         if (isSelfHit && isEnemyAttack && !isCounterSkill && isLastCoinHit && !_langguLastHitEnemies.Contains(attacker))
         {
-            Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}条件1满足：自身被敌方非反击技能的最后一枚硬币命中，攻击者={attacker.Name}{attackerTeamInfo}本回合未触发过");
             shouldTrigger = true;
         }
         // 条件2：同队魏国武将的护盾被敌方的非反击技能击破时：每个敌方单位每回合至多触发一次
         else if (isShieldBroken && isEnemyAttack && !isCounterSkill && !_langguTriggeredEnemies.Contains(attacker))
         {
-            Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}条件2满足：同队魏国武将的护盾被敌方非反击技能击破，攻击者={attacker.Name}{attackerTeamInfo}本回合未触发过");
             shouldTrigger = true;
         }
         // 条件3：自身的非反击技能命中敌方时：有（30+[韬晦]强度*5）%概率触发
@@ -330,23 +310,9 @@ public class 司马懿 : Character
                 double randomValue = random.NextDouble();
                 if (randomValue < probability)
                 {
-                    Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}条件3满足：自身非反击技能命中敌方，韬晦强度={taohuiBuff.Strength}，概率={(probability * 100):0.0}%，随机值={randomValue:F4}，触发成功");
                     shouldTrigger = true;
                 }
-                else
-                {
-                    Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}条件3未满足：自身非反击技能命中敌方，韬晦强度={taohuiBuff.Strength}，概率={(probability * 100):0.0}%，随机值={randomValue:F4}，触发失败");
-                }
             }
-            else
-            {
-                Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}条件3未满足：未找到韬晦Buff");
-            }
-        }
-        else
-        {
-            Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}所有条件均未满足，isSelfHit={isSelfHit}, isEnemyAttack={isEnemyAttack}, !isCounterSkill={!isCounterSkill}, isLastCoinHit={isLastCoinHit}, !_langguLastHitEnemies.Contains(attacker)={!_langguLastHitEnemies.Contains(attacker)}");
-            Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}额外条件：isShieldBroken={isShieldBroken}, !_langguTriggeredEnemies.Contains(attacker)={!_langguTriggeredEnemies.Contains(attacker)}, isSelfSkillHit={isSelfSkillHit}");
         }
         
         if (shouldTrigger)
@@ -355,19 +321,12 @@ public class 司马懿 : Character
             if (isSelfHit && isEnemyAttack && isLastCoinHit)
             {
                 _langguLastHitEnemies.Add(attacker);
-                Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}添加攻击者{attacker.Name}{attackerTeamInfo}到_lastLangguAttacker列表");
             }
             if (isShieldBroken && isEnemyAttack)
             {
                 _langguTriggeredEnemies.Add(attacker);
-                Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}添加攻击者{attacker.Name}{attackerTeamInfo}到_langguTriggeredEnemies列表");
             }
             _lastLangguAttacker = attacker;
-            Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}触发狼顾，当前触发次数={_langguTriggerCount}/{_langguMaxTriggerCount}");
-        }
-        else
-        {
-            Game1.Log($"[狼顾-触发判定] 司马懿{teamInfo}狼顾触发失败");
         }
         
         return shouldTrigger;

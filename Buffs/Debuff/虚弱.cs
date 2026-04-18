@@ -6,7 +6,7 @@ namespace TurnBasedRPG.Buffs.Debuff;
 
 public class 虚弱 : BaseBuff
 {
-    public 虚弱(int remainingTurns, int strength = 1) : base("虚弱", "每级强度使伤害增加属性降�?0%", remainingTurns, strength, false, false)
+    public 虚弱(int remainingTurns, int strength = 1) : base("虚弱", "每级强度使伤害增加属性降低10%", remainingTurns, strength, false, false)
     {
         IconColor = Color.Yellow;
     }

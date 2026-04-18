@@ -1,4 +1,4 @@
-using System;
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -36,7 +36,7 @@ public class Game1 : Game
     private Vector2 _targetCameraOffset = Vector2.Zero;
     
     // 游戏状态相关变量
-    private enum GameState { MainMenu, Battle }
+    private enum GameState { MainMenu, Battle, Encyclopedia, Tutorial }
     private GameState _currentGameState = GameState.MainMenu;
     
     // 角色详情界面相关变量
@@ -48,6 +48,18 @@ public class Game1 : Game
     private float _characterFadeAlpha = 1.0f;
     private Vector2 _characterCameraOffset = Vector2.Zero;
     private Vector2 _characterTargetCameraOffset = Vector2.Zero;
+    
+    // 游戏百科页面相关变量
+    private List<string> _encyclopediaTitles = new List<string>(); // 百科标题列表
+    private Dictionary<string, string> _encyclopediaContent = new Dictionary<string, string>(); // 百科内容字典
+    private string _selectedEncyclopediaTitle = null; // 当前选中的百科标题
+    private float _encyclopediaScrollOffset = 0.0f; // 百科页面滚动条偏移量
+    private bool _isDraggingEncyclopediaScrollBar = false; // 是否正在拖动百科页面滚动条
+    
+    // 教程系统相关变量
+    private TurnBasedRPG.Tutorials.TutorialManager? _tutorialManager; // 教程管理器
+    
+
     
     // 战斗日志滚动条相关变量
     private float _battleLogScrollOffset = 0.0f;
@@ -135,13 +147,15 @@ public class Game1 : Game
             Console.OutputEncoding = new System.Text.UTF8Encoding(true);
             Console.WriteLine(logMessage);
             
-            // 只保留三类日志：回合末/战斗结束贡献结算、ApplyDamage相关、AddShield相关
+            // 仅保留以下内容之一的日志：
+            // - 回合结束/战斗结束时的贡献统计列表
+            // - ApplyDamage相关内容
+            // - AddShield相关内容
             bool shouldLogToFile = 
-                message.Contains("[ApplyDamage]") || 
-                message.Contains("[AddShield]") || 
-                message.Contains("伤害贡献") ||
-                message.Contains("伤害统计") ||
-                message.Contains("贡献");
+                message.Contains("贡献统计") || 
+                message.Contains("贡献列表") ||
+                message.Contains("ApplyDamage") ||
+                message.Contains("AddShield");
             
             if (shouldLogToFile)
             {
@@ -287,6 +301,13 @@ public class Game1 : Game
             }
             
             Log("[游戏启动] 内容加载完成");
+            
+            // 初始化百科内容
+            InitializeEncyclopediaContent();
+            
+            // 初始化教程管理器
+            _tutorialManager = new TurnBasedRPG.Tutorials.TutorialManager();
+            _tutorialManager.Initialize(_spriteBatch, _font, _chineseFont, _pixel, GraphicsDevice, this);
         }
         catch (Exception ex)
         {
@@ -294,6 +315,132 @@ public class Game1 : Game
             Log($"[游戏启动] 异常堆栈: {ex.StackTrace}");
             throw;
         }
+    }
+
+    private void InitializeEncyclopediaContent()
+    {
+        // 清空现有内容
+        _encyclopediaTitles.Clear();
+        _encyclopediaContent.Clear();
+        
+        // 添加标题和内容（二级标题用[SUBHEADING]标记，三级标题用[HEADING]标记）
+        string title1 = "伤害计算公式";
+        string content1 = @"[SUBHEADING]（一） 总公式[/SUBHEADING]
+    最终伤害=基础值 × 技能等级修正 × 一类增伤 × 最终增伤 × 攻击方式易损 × 伤害种类易损。
+[SUBHEADING]（二） 各乘区计算规则[/SUBHEADING]
+    2.1  基础值=技能基础点数+硬币投掷总点数。
+    2.2  技能等级修正= 1 + (攻击方技能等级-防御方防御等级)×3%。计算结果最低为0.2。
+    2.3  一类增伤= 1 +攻击方伤害增加-防御方伤害减免。计算结果最低为0.2。
+    2.4  最终增伤= 1 +攻击方最终伤害增加-防御方最终伤害减免。计算结果最低为0.2。
+    2.5  攻击方式易损：根据技能攻击类型（斩/钝/穿刺/法术）采用目标对应系数，最低为0.1。
+    2.6  伤害种类易损：根据技能伤害类型（物理/魔法/真实）采用目标对应系数。物理与魔法默认1.0，真实默认2.0，最低为0.1。
+[SUBHEADING]（三） 暴击系统规则[/SUBHEADING]
+    3.1  暴击判定：最终暴击率=基础暴击率+最终暴击率-暴击抗性-最终暴击抗性，最低为0%。
+    3.2  暴击伤害：暴击伤害倍率= 1 +暴击伤害-暴击伤害抗性，最低为1.0。触发时，最终伤害乘算此倍率。";
+        
+        string title2 = "护盾系统规则";
+        string content2 = @"[SUBHEADING]（一） 护盾施加[/SUBHEADING]
+    1.1  实际护盾值=基础护盾值 ×(133% +护盾修正)。
+[SUBHEADING]（二） 护盾消耗[/SUBHEADING]
+    2.1  伤害结算顺序：优先扣除护盾，耗尽后再扣除生命值。
+    2.2  护盾被击破：当次伤害使护盾值从>0变为≤0时触发。
+[SUBHEADING]（三） 护盾相关效果[/SUBHEADING]
+    3.1  持有护盾时，角色获得30%最终伤害减免（来自""同仇之盾""）。
+    3.2  护盾被击破或受到伤害时，可触发""仁心""、""刚烈""、""默守""等技能特效。";
+        
+        string title3 = "状态系统规则";
+        string content3 = @"[SUBHEADING]（一） 核心属性[/SUBHEADING]
+    1.1  强度：影响效果数值，通常有上限。
+    1.2  剩余回合：每回合结束减少，null表示永久。
+    1.3  势力标记：带有此标记的状态（如""同仇之盾""）不可被转移/复制/驱散。
+[SUBHEADING]（二） 生命周期流程[/SUBHEADING]
+    2.1  回合开始：重置角色临时属性 → 更新所有状态 → 重新计算最终属性。
+    2.2  回合结束：非永久状态剩余回合数减1→ 移除剩余回合数归零的状态。";
+        
+        string title4 = "士气值与技能对抗";
+        string content4 = @"[SUBHEADING]（一） 技能构成[/SUBHEADING]
+    1.1  技能拥有基础点数、若干个可投掷的硬币（正/反）、及每个硬币的固定点数。
+[SUBHEADING]（二） 士气值影响[/SUBHEADING]
+    2.1  初始士气为0，硬币投出正面概率为50%。
+    2.2  士气值范围-20至20，正面概率= 50% + 2× 士气值，即在10%到90%间波动。
+[SUBHEADING]（三） 攻击技能对抗（拼点）[/SUBHEADING]
+    3.1  双方技能进行多次""拼点""：各自投掷一轮硬币计算总点数。
+    3.2  拼点失败方移除其最靠前的一枚硬币。
+    3.3  若仍有硬币，则再次拼点；否则，由胜方用剩余硬币投掷点数攻击败方。";
+        
+        string title5 = "技能池与弃牌";
+        string content5 = @"[SUBHEADING]（一） 常规技能池轮换[/SUBHEADING]
+    1.1  战斗开始时，行动槽获得一个由6个技能组成的技能池（3个1技能、2个2技能、1个3技能）及一个随机序列。
+    1.2  每回合，玩家从行动槽和备选槽的技能中选取一个使用。
+    1.3  回合结束时，丢弃行动槽中的技能，将备选槽技能移入，并从序列中取下一个技能填充备选槽。
+    1.4  序列抽空后，立即生成新的技能池和序列。
+[SUBHEADING]（二） 魏国武将弃牌机制[/SUBHEADING]
+    2.1  魏国武将每回合会额外丢弃备选槽中未被使用的技能。
+    2.2  根据丢弃的技能，获得独有""[决断]""状态，从而获得额外收益。此机制可用于管理技能回转节奏。";
+        
+        string title6 = "速度值规则";
+        string content6 = @"[SUBHEADING]（一） 速度值生成[/SUBHEADING]
+    1.1  每回合开始时，每个角色从其独有的速度值区间内随机抽取一个整数，作为本回合速度值。
+[SUBHEADING]（二） 全局排序规则[/SUBHEADING]
+    2.1  所有角色按速度值降序排列。
+    2.2  同队内速度值相同的角色，按选取角色时的顺序排列。
+    2.3  同一角色的多个行动槽，按槽位序号升序排列。";
+        
+        string title7 = "行动槽系统概述";
+        string content7 = @"[SUBHEADING]（一） 核心概念[/SUBHEADING]
+    1.1  战斗以""行动槽""为单位进行，每个角色拥有多个可装备技能的行动槽。
+    1.2  所有行动槽根据速度值全局排序，交替执行，取代传统的敌我回合制。
+[SUBHEADING]（二） 整体战斗流程[/SUBHEADING]
+    2.1  选择阶段：敌方AI自动选择目标；玩家为我方行动槽选择技能与目标（可手动）；界面显示箭头表明瞄准关系。
+    2.2  准备阶段：系统评估""单方面攻击""、裁决""多对一""冲突、计算最终执行顺序。
+    2.3  行动阶段：严格按照顺序执行业务逻辑（技能对抗、伤害结算等）。
+    2.4  结束阶段：检查死亡、触发回合结束效果、重置状态。
+[SUBHEADING]（三） 行动顺序细则[/SUBHEADING]
+    3.1  配对执行：互为目标的行动槽对（非单方面攻击）将绑定执行，按速度较高者的顺序行动。
+    3.2  实际行动：所有行动槽/配对按全局排序依次执行。同速时，我方角色先于敌方角色行动。
+[SUBHEADING]（四） 目标选取机制[/SUBHEADING]
+1． 我方自动选择
+        4.1.1  优先反击：若被敌方瞄准，则自动选择其中速度最高的作为目标，形成对抗。
+        4.1.2  主动选择：若未被瞄准，则优先选择速度低于自身且未被友方瞄准的敌人。
+        4.1.3  随机选择：若无符合上述条件的目标，则随机选择。
+2． 我方手动选择：点击我方空槽进入选择模式（黄框闪烁），再点击敌方行动槽设定目标。
+3． 敌方AI选择：优先选择未被其他敌方瞄准的我方行动槽，以分散火力。
+[SUBHEADING]（五） 单方面攻击判定[/SUBHEADING]
+1． 判定条件（满足其一）：
+        5.1.1  A瞄准B，但B未瞄准A，且A的速度值不高于B。
+        5.1.2  行动槽未被任何敌方行动槽瞄准。
+2． 效果：以天蓝色箭头表示。不进行拼点，攻击方直接投掷所有硬币结算伤害。
+[SUBHEADING]（六） 多对一冲突解决[/SUBHEADING]
+    6.1  当多个我方行动槽瞄准同一敌人时，仅保留""速度高于目标""或""被目标反瞄""的候选者。
+    6.2  在所有候选者中，最后设置目标的一个与目标形成正常对抗（红色箭头），其余降级为单方面攻击。
+    6.3  自动反瞄：若我方高速单位A选中了尚无目标的低速敌人B，系统将自动把B的目标设为A，促成互瞄。
+[SUBHEADING]（七） 闪避技能交互逻辑[/SUBHEADING]
+    7.1  生效条件（需同时满足）：
+        7.1.1  来袭技能不是反击技能或""视为反击""的技能。
+        7.1.2  来袭技能为攻击技能。
+        7.1.3  来袭技能以自身所在或所属角色的任一行动槽为目标。
+        7.1.4  来袭技能所在行动槽的速度值不高于自身。
+    7.2  对抗处理：满足条件时，闪避槽在其行动时机触发独立判定流程，与攻击方通过投掷硬币比对点数决定结果。
+[SUBHEADING]（八） 界面可视化辅助[/SUBHEADING]
+    8.1  全局视图：鼠标未悬停时，所有箭头半透明显示。
+    8.2  聚焦视图：鼠标悬停于任一行动槽时，仅高亮显示与之相关的""瞄准""与""被瞄准""箭头。";
+        
+        // 添加到列表和字典
+        _encyclopediaTitles.Add(title1);
+        _encyclopediaTitles.Add(title2);
+        _encyclopediaTitles.Add(title3);
+        _encyclopediaTitles.Add(title4);
+        _encyclopediaTitles.Add(title5);
+        _encyclopediaTitles.Add(title6);
+        _encyclopediaTitles.Add(title7);
+        
+        _encyclopediaContent[title1] = content1;
+        _encyclopediaContent[title2] = content2;
+        _encyclopediaContent[title3] = content3;
+        _encyclopediaContent[title4] = content4;
+        _encyclopediaContent[title5] = content5;
+        _encyclopediaContent[title6] = content6;
+        _encyclopediaContent[title7] = content7;
     }
 
     protected override void Update(GameTime gameTime)
@@ -336,37 +483,83 @@ public class Game1 : Game
             // 主界面逻辑
             if (_mainTitle.CheckClick(currentMouseState, _graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight))
             {
-                // 获取用户选择的行动槽数量
-                int slotCount = _mainTitle.SelectedSlotCount;
-                
-                // 开始战斗
-                // 根据已选择的角色创建BattleSystem
-                List<Character> allies = _mainTitle.SelectedAllies;
-                if (allies.Count == 0)
+                switch (_mainTitle.LastClickedButton)
                 {
-                    // 如果未选择，使用列表第一位己方角色
-                    allies.Add(new Characters.Allies.示例角色1());
+                    case MainTitle.ButtonType.StartGame:
+                        // 获取用户选择的行动槽数量
+                        int slotCount = _mainTitle.SelectedSlotCount;
+                        
+                        // 开始战斗
+                        // 根据已选择的角色创建BattleSystem
+                        List<Character> allies = _mainTitle.SelectedAllies;
+                        if (allies.Count == 0)
+                        {
+                            // 如果未选择，使用列表第一位己方角色
+                            allies.Add(new Characters.Allies.示例角色1());
+                        }
+                        
+                        List<Character> enemies = _mainTitle.SelectedEnemies;
+                        if (enemies.Count == 0)
+                        {
+                            // 如果未选择，使用列表第一位敌方角色
+                            enemies.Add(new Characters.Enemies.示例敌怪1());
+                        }
+                        
+                        // 验证角色数量是否超过行动槽数量
+                        if (allies.Count > slotCount || enemies.Count > slotCount)
+                        {
+                            // 这里可以添加一个错误提示的UI元素
+                            return;
+                        }
+                        
+                        // 创建BattleSystem时传入行动槽数量
+                        _battleSystem = new BattleSystem(allies, enemies, slotCount);
+                        // 订阅伤害事件
+                        _battleSystem.OnDamage += BattleSystem_OnDamage;
+                        _currentGameState = GameState.Battle;
+                        break;
+                        
+                    case MainTitle.ButtonType.Encyclopedia:
+                        _currentGameState = GameState.Encyclopedia;
+                        break;
+                        
+                    case MainTitle.ButtonType.Tutorial:
+                        _currentGameState = GameState.Tutorial;
+                        break;
+                }
+            }
+        }
+        else if (_currentGameState == GameState.Encyclopedia)
+        {
+            // 游戏百科界面
+            CheckEncyclopediaClick(currentMouseState, currentKeyboardState);
+        }
+        else if (_currentGameState == GameState.Tutorial)
+        {
+            // 教程入口界面 - 使用教程管理器
+            if (_tutorialManager != null)
+            {
+                // 第一次进入教程状态时，显示关卡选择
+                if (!_tutorialManager.ShowingLevelSelect && !_tutorialManager.IsInTutorial)
+                {
+                    _tutorialManager.ShowLevelSelect();
                 }
                 
-                List<Character> enemies = _mainTitle.SelectedEnemies;
-                if (enemies.Count == 0)
+                // 更新教程管理器
+                _tutorialManager.Update(gameTime, currentMouseState, _previousMouseState, 
+                                       currentKeyboardState, _previousKeyboardState);
+                
+                // 检查关卡选择点击
+                if (_tutorialManager.ShowingLevelSelect)
                 {
-                    // 如果未选择，使用列表第一位敌方角色
-                    enemies.Add(new Characters.Enemies.示例敌怪1());
+                    _tutorialManager.CheckLevelSelectClick(currentMouseState, _previousMouseState);
                 }
                 
-                // 验证角色数量是否超过行动槽数量
-                if (allies.Count > slotCount || enemies.Count > slotCount)
+                // 按Backspace键返回主菜单
+                if (IsKeyPressed(Keys.Back, currentKeyboardState))
                 {
-                    // 这里可以添加一个错误提示的UI元素
-                    return;
+                    ReturnToMainMenuFromTutorial();
                 }
-                
-                // 创建BattleSystem时传入行动槽数量
-                _battleSystem = new BattleSystem(allies, enemies, slotCount);
-                // 订阅伤害事件
-                _battleSystem.OnDamage += BattleSystem_OnDamage;
-                _currentGameState = GameState.Battle;
             }
         }
         else if (_currentGameState == GameState.Battle)
@@ -408,6 +601,12 @@ public class Game1 : Game
             }
             
             // 战斗界面逻辑
+            // 空格键暂停/继续战斗
+            if (IsKeyPressed(Keys.Space, currentKeyboardState))
+            {
+                _battleSystem.IsPaused = !_battleSystem.IsPaused;
+            }
+            
             if (_battleSystem.BattleEnded)
             {
                 if (IsKeyPressed(Keys.R, currentKeyboardState))
@@ -2019,6 +2218,147 @@ public class Game1 : Game
         }
     }
     
+    private void CheckEncyclopediaClick(MouseState currentMouseState, KeyboardState currentKeyboardState)
+    {
+        int windowWidth = _graphics.PreferredBackBufferWidth;
+        int windowHeight = _graphics.PreferredBackBufferHeight;
+        
+        // 检查Backspace键
+        if (IsKeyPressed(Keys.Back, currentKeyboardState))
+        {
+            ReturnToMainMenuFromEncyclopedia();
+            return;
+        }
+        
+        // 处理鼠标按下事件
+        if (currentMouseState.LeftButton == ButtonState.Pressed && _previousMouseState.LeftButton == ButtonState.Released)
+        {
+            // 检查关闭按钮
+            int closeButtonSize = 40;
+            int closeButtonX = windowWidth - closeButtonSize - 20;
+            int closeButtonY = 20;
+            if (IsPointInRectangle(currentMouseState.X, currentMouseState.Y, closeButtonX, closeButtonY, closeButtonSize, closeButtonSize))
+            {
+                ReturnToMainMenuFromEncyclopedia();
+                return;
+            }
+            
+            // 检查标题按钮点击
+            int buttonWidth = 150;
+            int buttonHeight = 45;
+            int buttonSpacing = 10;
+            int buttonStartX = 20;
+            int buttonStartY = 80;
+            
+            for (int i = 0; i < _encyclopediaTitles.Count; i++)
+            {
+                int buttonX = buttonStartX;
+                int buttonY = buttonStartY + i * (buttonHeight + buttonSpacing);
+                
+                if (IsPointInRectangle(currentMouseState.X, currentMouseState.Y, buttonX, buttonY, buttonWidth, buttonHeight))
+                {
+                    _selectedEncyclopediaTitle = _encyclopediaTitles[i];
+                    _encyclopediaScrollOffset = 0.0f; // 重置滚动条
+                    return;
+                }
+            }
+            
+            // 检查滚动条点击
+            if (_selectedEncyclopediaTitle != null)
+            {
+                int contentX = buttonStartX + buttonWidth + 30;
+                int contentY = 80;
+                int contentWidth = windowWidth - contentX - 40;
+                int textStartY = contentY + 60;
+                int textHeight = (windowHeight - contentY - 40) - 80;
+                int scrollBarWidth = 10;
+                int scrollBarX = contentX + contentWidth - scrollBarWidth;
+                int scrollBarY = textStartY;
+                int scrollBarHeight = textHeight;
+                
+                // 计算内容总高度
+                string contentText = _encyclopediaContent.ContainsKey(_selectedEncyclopediaTitle) 
+                    ? _encyclopediaContent[_selectedEncyclopediaTitle] 
+                    : "暂无内容";
+                SpriteFont textFont = IsChineseText(contentText) ? _chineseFont : _font;
+                int totalContentHeight = CalculateTextHeight(textFont, contentText, contentWidth - 40, 24);
+                
+                float maxScrollOffset = Math.Max(0, totalContentHeight - textHeight);
+                float scrollRatio = maxScrollOffset > 0 ? _encyclopediaScrollOffset / maxScrollOffset : 0;
+                int sliderHeight = totalContentHeight > 0 ? (int)(scrollBarHeight * (textHeight / (float)Math.Max(textHeight, totalContentHeight))) : scrollBarHeight;
+                sliderHeight = Math.Max(20, sliderHeight);
+                int sliderY = scrollBarY + (int)(scrollRatio * (scrollBarHeight - sliderHeight));
+                Rectangle sliderRect = new Rectangle(scrollBarX, sliderY, scrollBarWidth, sliderHeight);
+                
+                // 检查是否点击了滑块
+                if (sliderRect.Contains(currentMouseState.Position))
+                {
+                    _isDraggingEncyclopediaScrollBar = true;
+                }
+                // 检查是否点击了滚动条背景
+                else
+                {
+                    Rectangle scrollBarRect = new Rectangle(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight);
+                    if (scrollBarRect.Contains(currentMouseState.Position))
+                    {
+                        // 计算滚动条位置对应的滚动偏移
+                        float clickScrollRatio = (currentMouseState.Y - scrollBarY) / (float)scrollBarHeight;
+                        _encyclopediaScrollOffset = clickScrollRatio * maxScrollOffset;
+                        _encyclopediaScrollOffset = Math.Max(0, Math.Min(maxScrollOffset, _encyclopediaScrollOffset));
+                    }
+                }
+            }
+        }
+        // 处理鼠标释放事件
+        else if (currentMouseState.LeftButton == ButtonState.Released && _previousMouseState.LeftButton == ButtonState.Pressed)
+        {
+            _isDraggingEncyclopediaScrollBar = false;
+        }
+        // 处理鼠标拖动事件
+        else if (currentMouseState.LeftButton == ButtonState.Pressed && _isDraggingEncyclopediaScrollBar && _selectedEncyclopediaTitle != null)
+        {
+            int contentX = 20 + 150 + 30;
+            int contentY = 80;
+            int contentWidth = windowWidth - contentX - 40;
+            int textStartY = contentY + 60;
+            int textHeight = (windowHeight - contentY - 40) - 80;
+            int scrollBarWidth = 10;
+            int scrollBarX = contentX + contentWidth - scrollBarWidth;
+            int scrollBarY = textStartY;
+            int scrollBarHeight = textHeight;
+            
+            // 计算内容总高度
+            string contentText = _encyclopediaContent.ContainsKey(_selectedEncyclopediaTitle) 
+                ? _encyclopediaContent[_selectedEncyclopediaTitle] 
+                : "暂无内容";
+            SpriteFont textFont = IsChineseText(contentText) ? _chineseFont : _font;
+            int totalContentHeight = CalculateTextHeight(textFont, contentText, contentWidth - 40, 24);
+            
+            float maxScrollOffset = Math.Max(0, totalContentHeight - textHeight);
+            float dragScrollRatio = (currentMouseState.Y - scrollBarY) / (float)scrollBarHeight;
+            _encyclopediaScrollOffset = dragScrollRatio * maxScrollOffset;
+            _encyclopediaScrollOffset = Math.Max(0, Math.Min(maxScrollOffset, _encyclopediaScrollOffset));
+        }
+    }
+    
+    private void ReturnToMainMenuFromEncyclopedia()
+    {
+        _currentGameState = GameState.MainMenu;
+        _selectedEncyclopediaTitle = null;
+        _encyclopediaScrollOffset = 0.0f;
+        _isDraggingEncyclopediaScrollBar = false;
+        _mainTitle = new MainTitle(_spriteBatch, _font, _chineseFont, _pixel);
+    }
+    
+    public void ReturnToMainMenuFromTutorial()
+    {
+        if (_tutorialManager != null)
+        {
+            _tutorialManager.ExitTutorial();
+        }
+        _currentGameState = GameState.MainMenu;
+        _mainTitle = new MainTitle(_spriteBatch, _font, _chineseFont, _pixel);
+    }
 
     
     private void UpdateCharacterZoom()
@@ -2245,7 +2585,7 @@ public class Game1 : Game
                 int passiveHeight = CalculateTextHeight(passiveDescFont, passiveDescription, rightTwoThirdsWidth - 40, 24);
                 
                 // 计算完整的内容总高度
-                totalContentHeight = (int)(passiveNameSize.Y * 1.5f) + 40 + passiveHeight + 75 + 30 + 85 + 30 + 75 + 30;
+                totalContentHeight = (int)(passiveNameSize.Y * 1.5f) + 40 + passiveHeight + 75 + 30 + 85 + 30 + 75 + 30 + 75 + 30;
                 
                 // 绘制被动技能详情
                 int currentY = skillDetailY - (int)_scrollOffset;
@@ -2300,6 +2640,12 @@ public class Game1 : Game
                 }
                 SpriteFont finalLevelFont = GetFontForText(finalLevelText);
                 _spriteBatch.DrawString(finalLevelFont, finalLevelText, new Vector2(detailX, levelY), whiteWithAlpha, 0, Vector2.Zero, 1.2f, SpriteEffects.None, 0);
+                
+                // 显示速度范围
+                int speedY = levelY + 75; // 攻击等级/防御等级下方75像素
+                string speedText = $"速度范围：{_selectedCharacter.FinalMinSpeed}-{_selectedCharacter.FinalMaxSpeed}";
+                SpriteFont speedFont = GetFontForText(speedText);
+                _spriteBatch.DrawString(speedFont, speedText, new Vector2(detailX, speedY), whiteWithAlpha, 0, Vector2.Zero, 1.2f, SpriteEffects.None, 0);
             }
             catch (Exception)
             {
@@ -2998,6 +3344,24 @@ public class Game1 : Game
                         continue;
                     }
                     
+                    string trimmedParagraph = paragraph.Trim();
+                    
+                    // 检查是否是二级标题（[SUBHEADING]...[/SUBHEADING]格式）
+                    if (trimmedParagraph.StartsWith("[SUBHEADING]") && trimmedParagraph.EndsWith("[/SUBHEADING]"))
+                    {
+                        // 标题使用更大的高度
+                        height += (int)(36 * 1.3f);
+                        continue;
+                    }
+                    
+                    // 检查是否是三级标题（[HEADING]...[/HEADING]格式）
+                    if (trimmedParagraph.StartsWith("[HEADING]") && trimmedParagraph.EndsWith("[/HEADING]"))
+                    {
+                        // 标题使用更大的高度
+                        height += (int)(36 * 1.3f);
+                        continue;
+                    }
+                    
                     // 对于中文文本，使用逐字符检查的方式计算换行
                     string currentLine = "";
                     int lineCount = 1;
@@ -3036,7 +3400,7 @@ public class Game1 : Game
         }
     }
     
-    // 绘制带有条件格式的多行文本
+    // 绘制带有条件格式的多行文本（支持百科标题格式）
     private int DrawMultiLineTextWithConditionFormat(SpriteFont font, string text, Vector2 position, Microsoft.Xna.Framework.Color color, int maxWidth)
     {
         float y = position.Y;
@@ -3058,8 +3422,70 @@ public class Game1 : Game
                     continue;
                 }
                 
+                string trimmedParagraph = paragraph.Trim();
+                
+                // 检查是否是二级标题（[SUBHEADING]...[/SUBHEADING]格式）
+                if (trimmedParagraph.StartsWith("[SUBHEADING]") && trimmedParagraph.EndsWith("[/SUBHEADING]"))
+                {
+                    // 提取标题文本
+                    string headingText = trimmedParagraph.Substring(12, trimmedParagraph.Length - 25);
+                    
+                    // 计算标题宽度
+                    float headingWidth = CalculateStringWidth(headingText, _chineseFont, _font);
+                    
+                    // 绘制标题背景（RGB(80,80,80)）
+                    int backgroundPadding = 10;
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)position.X - 5, (int)y - 3, (int)headingWidth + backgroundPadding * 2, 36), new Color(80, 80, 80, 255));
+                    
+                    // 绘制标题文字（带白色轮廓，加大字号）
+                    Vector2 headingPosition = new Vector2(position.X + backgroundPadding, y);
+                    
+                    // 绘制白色轮廓
+                    DrawTextWithFontFallback(headingText, headingPosition + new Vector2(-1, -1), Color.White, position.X);
+                    DrawTextWithFontFallback(headingText, headingPosition + new Vector2(1, -1), Color.White, position.X);
+                    DrawTextWithFontFallback(headingText, headingPosition + new Vector2(-1, 1), Color.White, position.X);
+                    DrawTextWithFontFallback(headingText, headingPosition + new Vector2(1, 1), Color.White, position.X);
+                    
+                    // 绘制黑色文字
+                    DrawTextWithFontFallback(headingText, headingPosition, Color.Black, position.X);
+                    
+                    // 标题使用更大的行距
+                    y += 36 * 1.3f;
+                    continue;
+                }
+                
+                // 检查是否是三级标题（[HEADING]...[/HEADING]格式）
+                if (trimmedParagraph.StartsWith("[HEADING]") && trimmedParagraph.EndsWith("[/HEADING]"))
+                {
+                    // 提取标题文本
+                    string headingText = trimmedParagraph.Substring(9, trimmedParagraph.Length - 18);
+                    
+                    // 计算标题宽度
+                    float headingWidth = CalculateStringWidth(headingText, _chineseFont, _font);
+                    
+                    // 绘制标题背景（RGB(80,80,80)）
+                    int backgroundPadding = 10;
+                    _spriteBatch.Draw(_pixel, new Rectangle((int)position.X - 5, (int)y - 3, (int)headingWidth + backgroundPadding * 2, 36), new Color(80, 80, 80, 255));
+                    
+                    // 绘制标题文字（带白色轮廓，加大字号）
+                    Vector2 headingPosition = new Vector2(position.X + backgroundPadding, y);
+                    
+                    // 绘制白色轮廓
+                    DrawTextWithFontFallback(headingText, headingPosition + new Vector2(-1, -1), Color.White, position.X);
+                    DrawTextWithFontFallback(headingText, headingPosition + new Vector2(1, -1), Color.White, position.X);
+                    DrawTextWithFontFallback(headingText, headingPosition + new Vector2(-1, 1), Color.White, position.X);
+                    DrawTextWithFontFallback(headingText, headingPosition + new Vector2(1, 1), Color.White, position.X);
+                    
+                    // 绘制黑色文字
+                    DrawTextWithFontFallback(headingText, headingPosition, Color.Black, position.X);
+                    
+                    // 标题使用更大的行距
+                    y += 36 * 1.3f;
+                    continue;
+                }
+                
                 // 自动换行处理
-                string remainingText = paragraph.Trim();
+                string remainingText = trimmedParagraph;
                 
                 while (!string.IsNullOrEmpty(remainingText))
                 {
@@ -3316,6 +3742,26 @@ public class Game1 : Game
             _mainTitle.Draw(_graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight);
             _spriteBatch.End();
         }
+        else if (_currentGameState == GameState.Encyclopedia)
+        {
+            // 游戏百科界面
+            _spriteBatch.Begin();
+            DrawEncyclopedia();
+            _spriteBatch.End();
+        }
+        else if (_currentGameState == GameState.Tutorial)
+        {
+            // 教程界面 - 使用教程管理器绘制
+            _spriteBatch.Begin();
+            GraphicsDevice.Clear(Color.DarkOrange);
+            
+            if (_tutorialManager != null)
+            {
+                _tutorialManager.Draw();
+            }
+            
+            _spriteBatch.End();
+        }
         else if (_currentGameState == GameState.Battle)
         {
             if (_isCharacterDetailMode && _selectedCharacter != null && !_isCharacterZoomingOut)
@@ -3392,6 +3838,7 @@ public class Game1 : Game
                 DrawAllArrows();
                 DrawBattleMessage();
                 DrawBattleLog();
+                DrawPauseIndicator();
                 if (!_isZooming && !_isZoomingOut && !_isSkillDetailMode && !_isCharacterDetailMode && !_isCharacterZooming && !_isCharacterZoomingOut)
                 {
                     // 只有在正常模式下才绘制待选技能
@@ -3451,6 +3898,126 @@ public class Game1 : Game
         }
 
         base.Draw(gameTime);
+    }
+    
+    private void DrawEncyclopedia()
+    {
+        int windowWidth = _graphics.PreferredBackBufferWidth;
+        int windowHeight = _graphics.PreferredBackBufferHeight;
+        
+        // 绘制背景
+        _spriteBatch.Draw(_pixel, new Rectangle(0, 0, windowWidth, windowHeight), new Color(125, 125, 125, 255));
+        
+        // 绘制右上角关闭按钮（红底白X）
+        int closeButtonSize = 40;
+        int closeButtonX = windowWidth - closeButtonSize - 20;
+        int closeButtonY = 20;
+        _spriteBatch.Draw(_pixel, new Rectangle(closeButtonX, closeButtonY, closeButtonSize, closeButtonSize), Color.Red);
+        
+        // 绘制白色X
+        string closeText = "X";
+        SpriteFont closeFont = GetFontForText(closeText);
+        Vector2 closeTextSize = closeFont.MeasureString(closeText);
+        _spriteBatch.DrawString(closeFont, closeText, 
+            new Vector2(closeButtonX + closeButtonSize / 2 - closeTextSize.X / 2, 
+                       closeButtonY + closeButtonSize / 2 - closeTextSize.Y / 2), 
+            Color.White, 0, Vector2.Zero, 1.5f, SpriteEffects.None, 0);
+        
+        // 绘制标题按钮区域
+        int buttonWidth = 200;
+        int buttonHeight = 45;
+        int buttonSpacing = 10;
+        int buttonStartX = 20;
+        int buttonStartY = 80;
+        
+        for (int i = 0; i < _encyclopediaTitles.Count; i++)
+        {
+            int buttonX = buttonStartX;
+            int buttonY = buttonStartY + i * (buttonHeight + buttonSpacing);
+            
+            // 绘制按钮背景
+            Color buttonColor = _selectedEncyclopediaTitle == _encyclopediaTitles[i] ? Color.DarkGreen : new Color(80, 80, 80, 255);
+            _spriteBatch.Draw(_pixel, new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight), buttonColor);
+            
+            // 绘制按钮文字（带白色轮廓）
+            string titleText = _encyclopediaTitles[i];
+            SpriteFont titleFont = GetFontForText(titleText);
+            Vector2 titleTextSize = titleFont.MeasureString(titleText);
+            Vector2 textPosition = new Vector2(buttonX + (buttonWidth - titleTextSize.X) / 2, 
+                                               buttonY + (buttonHeight - titleTextSize.Y) / 2);
+            
+            // 绘制白色轮廓
+            _spriteBatch.DrawString(titleFont, titleText, textPosition + new Vector2(-1, -1), Color.White);
+            _spriteBatch.DrawString(titleFont, titleText, textPosition + new Vector2(1, -1), Color.White);
+            _spriteBatch.DrawString(titleFont, titleText, textPosition + new Vector2(-1, 1), Color.White);
+            _spriteBatch.DrawString(titleFont, titleText, textPosition + new Vector2(1, 1), Color.White);
+            
+            // 绘制黑色文字
+            _spriteBatch.DrawString(titleFont, titleText, textPosition, Color.Black);
+        }
+        
+        // 如果选择了标题，绘制文本内容区域
+        if (_selectedEncyclopediaTitle != null)
+        {
+            int contentX = buttonStartX + buttonWidth + 30;
+            int contentY = 80;
+            int contentWidth = windowWidth - contentX - 40;
+            int contentHeight = windowHeight - contentY - 40;
+            
+            // 绘制内容区域背景
+            _spriteBatch.Draw(_pixel, new Rectangle(contentX, contentY, contentWidth, contentHeight), new Color(80, 80, 80, 255));
+            
+            // 绘制内容标题
+            string contentTitle = _selectedEncyclopediaTitle;
+            SpriteFont contentTitleFont = GetFontForText(contentTitle);
+            Vector2 contentTitleSize = contentTitleFont.MeasureString(contentTitle);
+            _spriteBatch.DrawString(contentTitleFont, contentTitle, 
+                new Vector2(contentX + 20, contentY + 10), Color.White, 0, Vector2.Zero, 1.5f, SpriteEffects.None, 0);
+            
+            // 绘制内容文本（使用裁剪区域）
+            int textStartY = contentY + 60;
+            int textHeight = contentHeight - 80;
+            Rectangle scissorRect = new Rectangle(contentX, textStartY, contentWidth, textHeight);
+            Rectangle originalScissorRect = GraphicsDevice.ScissorRectangle;
+            
+            // 开始新的spriteBatch批次，启用裁剪
+            _spriteBatch.End();
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, null, null, new RasterizerState { ScissorTestEnable = true });
+            GraphicsDevice.ScissorRectangle = scissorRect;
+            
+            // 从内容字典中获取文本
+            string contentText = _encyclopediaContent.ContainsKey(_selectedEncyclopediaTitle) 
+                ? _encyclopediaContent[_selectedEncyclopediaTitle] 
+                : "暂无内容";
+            SpriteFont textFont = IsChineseText(contentText) ? _chineseFont : _font;
+            DrawMultiLineTextWithConditionFormat(textFont, contentText, 
+                new Vector2(contentX + 20, textStartY - (int)_encyclopediaScrollOffset), Color.White, contentWidth - 40);
+            
+            // 计算内容总高度（用于滚动条）
+            int totalContentHeight = CalculateTextHeight(textFont, contentText, contentWidth - 40, 24);
+            
+            // 恢复原始裁剪区域
+            _spriteBatch.End();
+            GraphicsDevice.ScissorRectangle = originalScissorRect;
+            _spriteBatch.Begin();
+            
+            // 绘制滚动条
+            int scrollBarWidth = 10;
+            int scrollBarX = contentX + contentWidth - scrollBarWidth;
+            int scrollBarY = textStartY;
+            int scrollBarHeight = textHeight;
+            
+            // 绘制滚动条背景
+            _spriteBatch.Draw(_pixel, new Rectangle(scrollBarX, scrollBarY, scrollBarWidth, scrollBarHeight), Color.Gray);
+            
+            // 计算并绘制滑块
+            float maxScrollOffset = Math.Max(0, totalContentHeight - textHeight);
+            float scrollRatio = maxScrollOffset > 0 ? _encyclopediaScrollOffset / maxScrollOffset : 0;
+            int sliderHeight = totalContentHeight > 0 ? (int)(scrollBarHeight * (textHeight / (float)Math.Max(textHeight, totalContentHeight))) : scrollBarHeight;
+            sliderHeight = Math.Max(20, sliderHeight);
+            int sliderY = scrollBarY + (int)(scrollRatio * (scrollBarHeight - sliderHeight));
+            _spriteBatch.Draw(_pixel, new Rectangle(scrollBarX, sliderY, scrollBarWidth, sliderHeight), Color.White);
+        }
     }
     
     private void DrawSkillDetail()
@@ -4660,6 +5227,38 @@ public class Game1 : Game
         _spriteBatch.DrawString(messageFont, _battleSystem.BattleMessage, messagePos, Color.White, 0f, 
             new Vector2(messageFont.MeasureString(_battleSystem.BattleMessage).X / 2, 0), 1f, SpriteEffects.None, 0f);
     }
+    
+    private void DrawPauseIndicator()
+    {
+        if (_battleSystem.IsPaused)
+        {
+            int windowWidth = _graphics.PreferredBackBufferWidth;
+            int windowHeight = _graphics.PreferredBackBufferHeight;
+            
+            // 绘制半透明背景遮罩
+            _spriteBatch.Draw(_pixel, new Rectangle(0, 0, windowWidth, windowHeight), new Color(0, 0, 0, 128));
+            
+            // 绘制暂停文字
+            string pauseText = "已暂停 - 按空格键继续";
+            SpriteFont pauseFont = IsChineseText(pauseText) ? _chineseFont : _font;
+            Vector2 pauseTextSize = pauseFont.MeasureString(pauseText);
+            Vector2 pausePosition = new Vector2(windowWidth / 2, windowHeight / 2);
+            
+            // 绘制白色轮廓
+            _spriteBatch.DrawString(pauseFont, pauseText, pausePosition + new Vector2(-2, -2), Color.White, 0f, 
+                new Vector2(pauseTextSize.X / 2, pauseTextSize.Y / 2), 2.0f, SpriteEffects.None, 0f);
+            _spriteBatch.DrawString(pauseFont, pauseText, pausePosition + new Vector2(2, -2), Color.White, 0f, 
+                new Vector2(pauseTextSize.X / 2, pauseTextSize.Y / 2), 2.0f, SpriteEffects.None, 0f);
+            _spriteBatch.DrawString(pauseFont, pauseText, pausePosition + new Vector2(-2, 2), Color.White, 0f, 
+                new Vector2(pauseTextSize.X / 2, pauseTextSize.Y / 2), 2.0f, SpriteEffects.None, 0f);
+            _spriteBatch.DrawString(pauseFont, pauseText, pausePosition + new Vector2(2, 2), Color.White, 0f, 
+                new Vector2(pauseTextSize.X / 2, pauseTextSize.Y / 2), 2.0f, SpriteEffects.None, 0f);
+            
+            // 绘制黄色文字
+            _spriteBatch.DrawString(pauseFont, pauseText, pausePosition, Color.Yellow, 0f, 
+                new Vector2(pauseTextSize.X / 2, pauseTextSize.Y / 2), 2.0f, SpriteEffects.None, 0f);
+        }
+    }
 
     private void DrawBattleLog()
     {
@@ -4676,20 +5275,33 @@ public class Game1 : Game
         int logAreaWidth = scrollBarX - logAreaLeftMargin - logAreaRightMargin;
         int logAreaX = logAreaLeftMargin;
         int lineHeight = 18;
-        int lineSpacing = lineHeight * 2; // 每两条日志中间间隔一行
+        int lineSpacing = lineHeight; // 每两条日志中间间隔一行
         
         // 绘制滚动条 - 深灰色为底色，白色为滑块
         _spriteBatch.Draw(_pixel, new Rectangle(scrollBarX, logAreaY, scrollBarWidth, logAreaHeight), Color.DarkGray);
+        
+        // 合并两个日志列表：先显示上一回合的日志，再显示当前回合的日志
+        List<string> allLogs = new List<string>();
+        // 上一回合的日志（倒序显示，最新的在最上面）
+        for (int i = _battleSystem.PreviousBattleLog.Count - 1; i >= 0; i--)
+        {
+            allLogs.Add(_battleSystem.PreviousBattleLog[i]);
+        }
+        // 当前回合的日志（倒序显示，最新的在最上面）
+        for (int i = _battleSystem.BattleLog.Count - 1; i >= 0; i--)
+        {
+            allLogs.Add(_battleSystem.BattleLog[i]);
+        }
         
         // 计算所有日志的总高度（需要考虑自动换行）
         float totalLogHeight = 0;
         List<float> logLineOffsets = new List<float>(); // 每个日志的起始偏移
         float currentOffset = 0;
         
-        for (int i = 0; i < _battleSystem.BattleLog.Count; i++)
+        for (int i = 0; i < allLogs.Count; i++)
         {
             logLineOffsets.Add(currentOffset);
-            string logEntry = _battleSystem.BattleLog[_battleSystem.BattleLog.Count - 1 - i];
+            string logEntry = allLogs[i];
             string cleanedLogEntry = CleanLogEntry(logEntry);
             
             // 计算自动换行后的行数
@@ -4726,12 +5338,11 @@ public class Game1 : Game
         
         // 绘制日志内容（从最新到最旧，带自动换行）
         float drawOffset = -_battleLogScrollOffset;
-        for (int i = 0; i < _battleSystem.BattleLog.Count; i++)
+        for (int i = 0; i < allLogs.Count; i++)
         {
             try
             {
-                int logIndex = _battleSystem.BattleLog.Count - 1 - i;
-                string logEntry = _battleSystem.BattleLog[logIndex];
+                string logEntry = allLogs[i];
                 string cleanedLogEntry = CleanLogEntry(logEntry);
                 float logStartY = logAreaY + drawOffset + logLineOffsets[i];
                 

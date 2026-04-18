@@ -1,4 +1,4 @@
-using System;
+﻿﻿using System;
 using Microsoft.Xna.Framework;
 using TurnBasedRPG.Systems;
 
@@ -14,7 +14,7 @@ public class 镇岳反攻 : BaseSkill
         CoinEffectiveness = 12.0f;
         AttackLevelModifier = 0;
         Level = 2;
-        ExtraEffects = "[攻击前]若自身剩余护盾值高于25%最大生命，则本技能的拼点威力提升2\n\n[命中时]若目标持有可转移的减益状态，则尝试将目标的最多2个随机减益状态复制后再次施加给目标\n\n[攻击后]额外造成相当于自身剩余护盾值15%的真实伤害；若目标未持有护盾，则真实伤害倍率提升至20%\n\n（可转移的减益状态：非永久持续、非特定武将专属、不具有\"不可驱散\"标签的减益类状态）";
+        ExtraEffects = "[攻击前]若自身剩余护盾值高于25%最大生命，则本技能的拼点威力提升2\n[命中时]若目标持有可转移的减益状态，则尝试将目标的最多2个随机减益状态复制后再次施加给目标\n[攻击后]额外造成相当于自身剩余护盾值15%的真实伤害；若目标未持有护盾，则真实伤害倍率提升至20%\n（可转移的减益状态：非永久持续、非特定武将专属、不具有\"不可驱散\"标签的减益类状态）";
     }
     
     public void ApplyShieldEnhancement()

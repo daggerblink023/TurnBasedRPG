@@ -1,4 +1,4 @@
-using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using TurnBasedRPG.Characters;
@@ -204,18 +204,12 @@ public class 曹丕 : Character
                     var siYeChengZuoBuff = _buffHandler?.GetBuffs(this).Find(b => b is 嗣业承祚);
                     if (siYeChengZuoBuff != null)
                     {
-                        Game1.Log($"[曹丕-嗣业承祚] 魏室初锋技能，嗣业承祚强度从{siYeChengZuoBuff.Strength}增加到{siYeChengZuoBuff.Strength + 1}");
                         siYeChengZuoBuff.Strength += 1;
                         // 处理溢出
                         if (siYeChengZuoBuff is 嗣业承祚)
                         {
                             ((嗣业承祚)siYeChengZuoBuff).HandleOverflow(this, _buffHandler, battleSystem);
                         }
-                        Game1.Log($"[曹丕-嗣业承祚] 魏室初锋技能处理完成，当前嗣业承祚强度={siYeChengZuoBuff.Strength}");
-                    }
-                    else
-                    {
-                        Game1.Log($"[曹丕-嗣业承祚] 魏室初锋技能，未找到嗣业承祚Buff");
                     }
                 }
                 // 处理定策安邦技能：[回合开始时]获得1级[嗣业承祚]
@@ -224,18 +218,12 @@ public class 曹丕 : Character
                     var siYeChengZuoBuff = _buffHandler?.GetBuffs(this).Find(b => b is 嗣业承祚);
                     if (siYeChengZuoBuff != null)
                     {
-                        Game1.Log($"[曹丕-嗣业承祚] 定策安邦技能，嗣业承祚强度从{siYeChengZuoBuff.Strength}增加到{siYeChengZuoBuff.Strength + 1}");
                         siYeChengZuoBuff.Strength += 1;
                         // 处理溢出
                         if (siYeChengZuoBuff is 嗣业承祚)
                         {
                             ((嗣业承祚)siYeChengZuoBuff).HandleOverflow(this, _buffHandler, battleSystem);
                         }
-                        Game1.Log($"[曹丕-嗣业承祚] 定策安邦技能处理完成，当前嗣业承祚强度={siYeChengZuoBuff.Strength}");
-                    }
-                    else
-                    {
-                        Game1.Log($"[曹丕-嗣业承祚] 定策安邦技能，未找到嗣业承祚Buff");
                     }
                 }
                 // 处理受禅代汉技能：[回合开始时]获得1级[嗣业承祚]
@@ -244,18 +232,12 @@ public class 曹丕 : Character
                     var siYeChengZuoBuff = _buffHandler?.GetBuffs(this).Find(b => b is 嗣业承祚);
                     if (siYeChengZuoBuff != null)
                     {
-                        Game1.Log($"[曹丕-嗣业承祚] 受禅代汉技能，嗣业承祚强度从{siYeChengZuoBuff.Strength}增加到{siYeChengZuoBuff.Strength + 1}");
                         siYeChengZuoBuff.Strength += 1;
                         // 处理溢出
                         if (siYeChengZuoBuff is 嗣业承祚)
                         {
                             ((嗣业承祚)siYeChengZuoBuff).HandleOverflow(this, _buffHandler, battleSystem);
                         }
-                        Game1.Log($"[曹丕-嗣业承祚] 受禅代汉技能处理完成，当前嗣业承祚强度={siYeChengZuoBuff.Strength}");
-                    }
-                    else
-                    {
-                        Game1.Log($"[曹丕-嗣业承祚] 受禅代汉技能，未找到嗣业承祚Buff");
                     }
                 }
             }
@@ -264,81 +246,53 @@ public class 曹丕 : Character
     
     public void OnWeiSkillHit(Character target, BattleSystem battleSystem, List<Character> allCharacters, Character attacker = null, bool isCounterSkill = false)
     {
-        string teamInfo = IsAlly ? "-我方" : "-敌方";
-        string attackerTeamInfo = attacker?.IsAlly == true ? "-我方" : "-敌方";
-        string targetTeamInfo = target?.IsAlly == true ? "-我方" : "-敌方";
-        
         _weiSkillHitCount++;
-        Game1.Log($"[曹丕-触发判定] 曹丕{teamInfo}魏国技能命中，命中计数增加至{_weiSkillHitCount}，攻击者={attacker?.Name}{attackerTeamInfo}，目标={target?.Name}{targetTeamInfo}，是否反击技能={isCounterSkill}");
         
         // 条件1：全队魏国武将的攻击/反击技能累计命中至少5次，触发制衡
         if (_weiSkillHitCount >= 5 && _currentCounterTriggerThisTurn < _maxCounterTriggerPerTurn)
         {
-            Game1.Log($"[曹丕-触发判定] 曹丕{teamInfo}满足条件1：全队魏国武将累计命中{_weiSkillHitCount}次，达到触发阈值5次，当前制衡触发次数={_currentCounterTriggerThisTurn}/{_maxCounterTriggerPerTurn}");
-            
             var siYeChengZuoBuff = _buffHandler?.GetBuffs(this).Find(b => b is 嗣业承祚);
             if (siYeChengZuoBuff != null && siYeChengZuoBuff.Strength > 0)
             {
-                Game1.Log($"[曹丕-触发判定] 曹丕{teamInfo}嗣业承祚强度={siYeChengZuoBuff.Strength}，足够消耗，开始触发制衡");
-                
                 _currentCounterTriggerThisTurn++;
                 _counterTriggerCount++;
                 _weiSkillHitCount -= 5;
                 
                 // 消耗一级嗣业承祚
                 siYeChengZuoBuff.Strength -= 1;
-                Game1.Log($"[曹丕-嗣业承祚] 曹丕{teamInfo}消耗一级嗣业承祚，当前强度={siYeChengZuoBuff.Strength}");
                 
                 // 调用BattleSystem中的TriggerCaoPiCounter方法触发制衡
                 battleSystem.TriggerCaoPiCounter(this, target, false);
                 
-                Game1.Log($"[曹丕-制衡] 曹丕{teamInfo}全队魏国武将累计命中触发制衡技能，当前触发次数={_currentCounterTriggerThisTurn}/{_maxCounterTriggerPerTurn}");
-                
                 // 检查是否可以触发魏武洪流（制衡累计触发3次）
                 if (_counterTriggerCount >= 3 && _currentWeiWuHongLiuTriggerThisTurn < _maxWeiWuHongLiuTriggerPerTurn)
                 {
-                    Game1.Log($"[曹丕-触发判定] 曹丕{teamInfo}满足魏武洪流条件：制衡累计触发{_counterTriggerCount}次，达到触发阈值3次");
                     _currentWeiWuHongLiuTriggerThisTurn++;
                     _counterTriggerCount = 0; // 重置制衡触发次数
                     
                     // 调用BattleSystem中的TriggerCaoPiCounter方法触发魏武洪流
                     battleSystem.TriggerCaoPiCounter(this, target, true);
-                    Game1.Log($"[曹丕-魏武洪流] 曹丕{teamInfo}制衡累计触发3次，触发魏武洪流技能，当前触发次数={_currentWeiWuHongLiuTriggerThisTurn}/{_maxWeiWuHongLiuTriggerPerTurn}");
                 }
-            }
-            else if (siYeChengZuoBuff != null && siYeChengZuoBuff.Strength == 0)
-            {
-                // 嗣业承祚强度为0，取消使用并返还触发次数
-                Game1.Log($"[曹丕-制衡] 曹丕{teamInfo}嗣业承祚强度为0，取消触发制衡");
-            }
-            else
-            {
-                Game1.Log($"[曹丕-制衡] 曹丕{teamInfo}未找到嗣业承祚Buff，取消触发制衡");
             }
         }
         
         // 条件2：曹丕的攻击技能命中敌方时，触发制衡（每回合至多触发一次）
         if (attacker == this && !isCounterSkill && target.IsAlly != this.IsAlly && _currentCaoPiAttackCounterTriggerThisTurn < _maxCaoPiAttackCounterTriggerPerTurn)
         {
-            Game1.Log($"[曹丕-触发判定] 曹丕{teamInfo}满足条件2：自身攻击命中敌方，当前触发次数={_currentCaoPiAttackCounterTriggerThisTurn}/{_maxCaoPiAttackCounterTriggerPerTurn}");
             _currentCaoPiAttackCounterTriggerThisTurn++;
             
             // 调用BattleSystem中的TriggerCaoPiCounter方法触发制衡
             battleSystem.TriggerCaoPiCounter(this, target, false);
-            
-            Game1.Log($"[曹丕-制衡] 曹丕{teamInfo}自身攻击命中触发制衡技能，当前触发次数={_currentCaoPiAttackCounterTriggerThisTurn}/{_maxCaoPiAttackCounterTriggerPerTurn}");
         }
         
         // 检查是否可以触发魏武洪流（嗣业承祚强度到达3）
         var siYeChengZuoBuffCheck = _buffHandler?.GetBuffs(this).Find(b => b is 嗣业承祚);
         if (siYeChengZuoBuffCheck != null && siYeChengZuoBuffCheck.Strength >= 3 && _currentWeiWuHongLiuTriggerThisTurn < _maxWeiWuHongLiuTriggerPerTurn)
         {
-            Game1.Log($"[曹丕-触发判定] 曹丕{teamInfo}满足魏武洪流条件：嗣业承祚强度={siYeChengZuoBuffCheck.Strength}，达到触发阈值3级");
             _currentWeiWuHongLiuTriggerThisTurn++;
             
             // 调用BattleSystem中的TriggerCaoPiCounter方法触发魏武洪流
             battleSystem.TriggerCaoPiCounter(this, target, true);
-            Game1.Log($"[曹丕-魏武洪流] 曹丕{teamInfo}嗣业承祚强度到达3，触发魏武洪流技能，当前触发次数={_currentWeiWuHongLiuTriggerThisTurn}/{_maxWeiWuHongLiuTriggerPerTurn}");
         }
     }
     
@@ -352,21 +306,13 @@ public class 曹丕 : Character
             var siYeChengZuoBuff = _buffHandler?.GetBuffs(this).Find(b => b is 嗣业承祚);
             if (siYeChengZuoBuff != null)
             {
-                Game1.Log($"[曹丕-嗣业承祚] 御极守成技能，受到护盾伤害，嗣业承祚强度从{siYeChengZuoBuff.Strength}增加到{siYeChengZuoBuff.Strength + 1}");
                 siYeChengZuoBuff.Strength += 1;
                 // 处理溢出
                 if (siYeChengZuoBuff is 嗣业承祚)
                 {
                     ((嗣业承祚)siYeChengZuoBuff).HandleOverflow(this, _buffHandler, battleSystem);
                 }
-                Game1.Log($"[曹丕-嗣业承祚] 御极守成技能处理完成，当前嗣业承祚强度={siYeChengZuoBuff.Strength}");
             }
-            else
-            {
-                Game1.Log($"[曹丕-嗣业承祚] 御极守成技能，未找到嗣业承祚Buff");
-            }
-            
-            Game1.Log($"[曹丕-御极守成] 受到护盾伤害，获得1级嗣业承祚，当前触发次数={_shieldDamageTriggerCount}/{_maxShieldDamageTriggerPerTurn}");
         }
     }
     

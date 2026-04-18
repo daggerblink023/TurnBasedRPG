@@ -61,3 +61,41 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+
+# ================ 为 MonoGame 回合制 RPG 项目添加的规则 ================
+
+# 1. 明确 C# 及相关文件的行尾符（Windows 环境推荐）
+*.cs          text eol=crlf
+*.csproj      text eol=crlf
+*.sln         text eol=crlf
+*.config      text eol=crlf
+*.json        text eol=crlf
+*.xml         text eol=crlf
+*.md          text eol=crlf
+*.txt         text eol=crlf
+
+# 2. 游戏资源文件：必须标记为二进制，防止损坏
+*.png         binary
+*.jpg         binary
+*.jpeg        binary
+*.bmp         binary
+*.tga         binary
+*.dds         binary
+*.wav         binary
+*.mp3         binary
+*.ogg         binary
+*.fbx         binary
+*.obj         binary
+*.blend       binary
+*.tif         binary
+*.psd         binary
+
+# 3. MonoGame 内容管道文件
+*.mgcb        text
+*.xnb         binary
+
+# 4. 游戏运行时文件（通常不应提交，但明确其类型）
+*.sav         binary
+*.save        binary
+*.log         text

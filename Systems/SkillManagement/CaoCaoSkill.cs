@@ -84,7 +84,7 @@ public class CaoCaoSkill : BattleSystem
             battleSystem._slotToCharacterMap[counterSlot] = caoCao;
         }
 
-        battleSystem.BattleLog.Add($"曹操{(caoCao.IsAlly ? "-我方" : "-敌方")}的霸道之力爆发，使用青釭开天攻击敌方全体！");
+
 
         // 对每个敌方单位造成伤害
         foreach (var enemy in aliveEnemies)
@@ -113,7 +113,7 @@ public class CaoCaoSkill : BattleSystem
         int skillLevel = attacker.FinalAttackLevel;
         int targetLevelForCalculation = target.FinalDefenseLevel;
         int levelDifference = skillLevel - targetLevelForCalculation;
-        double skillLevelMultiplier = 1.0 + ((double)levelDifference * 0.045);
+        double skillLevelMultiplier = 1.5 + ((double)levelDifference * 0.045);
         skillLevelMultiplier = Math.Max(0.2, skillLevelMultiplier);
 
         // 计算伤害乘区

@@ -361,3 +361,72 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# ================ 为 MonoGame/C# RPG 项目添加的规则 ================
+
+# MonoGame 特定文件
+*.mgcb
+Content/obj/
+Content/bin/
+**/Content/*.xnb
+*.xnb
+MonoGame/
+MGBuildReference/
+
+# Unity/Godot 相关（如果未来需要）
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# 项目构建相关
+[Tt]humbs.db
+Desktop.ini
+.DS_Store
+*.pidb
+*.meta
+*.unityproj
+*.mat
+*.asset
+
+# 游戏特定文件
+game.ini
+config.ini
+settings.ini
+*.sav
+*.save
+*.dat
+
+# 运行时生成的文件
+output.txt
+error.log
+crash.dmp
+*.stackdump
+*.core
+
+# 打包/发布文件
+*.exe
+*.dll
+*.so
+*.dylib
+*.app
+*.ipa
+*.apk
+*.msi
+*.zip
+*.tar.gz
+*.7z
+/Publish/
+/Deploy/
+/打包/
+/发布/
+
+# 个人开发环境文件（可选）
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

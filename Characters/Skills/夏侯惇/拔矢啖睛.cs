@@ -15,7 +15,7 @@ public class 拔矢啖睛 : BaseSkill
         CoinEffectiveness = 18.0f;
         AttackLevelModifier = 0;
         Level = 2;
-        ExtraEffects = "[回合开始时]使同队所有魏国武将获得2级忍耐，持续2回合，每回合最多触发一次\n[最后一枚硬币使用时]若目标的防御等级低于自身，则本硬币造成真实伤害且临时获得（自身忍耐效果强度x10）%伤害提升";
+        ExtraEffects = "[回合开始时]使同队所有魏国武将获得2级忍耐，持续2回合，每回合最多触发一次\n[最后一枚硬币使用时]若目标的防御等级低于自身，则本硬币造成真实伤害且临时获得（自身忍耐的状态强度x10）%伤害提升";
     }
     
     public void SetAsLastCoin(bool isLast)

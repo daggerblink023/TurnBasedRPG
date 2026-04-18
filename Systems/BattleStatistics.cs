@@ -124,7 +124,7 @@ public class BattleStatistics
     {
         _currentRound++;
         
-        // 重置本回合统计数据
+        // 重置本回合的统计数据
         foreach (var stats in _characterStats.Values)
         {
             stats.CurrentRoundTotalDamage = 0;

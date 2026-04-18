@@ -1,4 +1,4 @@
-using System;
+﻿﻿using System;
 using Microsoft.Xna.Framework;
 using TurnBasedRPG.Buffs;
 using TurnBasedRPG.Characters;
@@ -7,7 +7,7 @@ namespace TurnBasedRPG.Buffs.Buff;
 
 public class 奔狼 : BaseBuff
 {
-    public 奔狼(int strength = 1) : base("奔狼", "攻击等级+（状态强度）级，防御等级-（状态强度）级；受到的反弹伤害降低（40+状态强�?5�?\n每拥�?级强度，速度最小值与速度最大值分�?1", null, strength, false, true)
+    public 奔狼(int strength = 1) : base("奔狼", "攻击等级+（状态强度）级，防御等级-（状态强度）级；受到的反弹伤害降低（40+状态强度*5）%\n每拥有5级强度，速度最小值与速度最大值分别+1", null, strength, false, true)
     {
         IconColor = Color.DarkOrange;
     }
@@ -28,7 +28,7 @@ public class 奔狼 : BaseBuff
         character.AttackLevelAdjustment += Strength;
         character.DefenseLevelAdjustment -= Strength;
         
-        // 每拥�?级强度，速度最小值与速度最大值分�?1
+        // 每拥有5级强度，速度最小值与速度最大值分别+1
         int speedBonus = Strength / 5;
         if (speedBonus > 0)
         {

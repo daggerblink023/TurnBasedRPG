@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xna.Framework;
 using TurnBasedRPG.Buffs;
 using TurnBasedRPG.Characters;
@@ -7,7 +7,7 @@ namespace TurnBasedRPG.Buffs.Debuff;
 
 public class 怖吓 : BaseBuff
 {
-    public 怖吓(int remainingTurns = 3, int strength = 1) : base("怖吓", "攻击等级降低（状态强度）�?, remainingTurns, strength, false, false)
+    public 怖吓(int remainingTurns = 3, int strength = 1) : base("怖吓", "鏀诲嚮绛夌骇闄嶄綆锛堢姸鎬佸己搴︼級绾?", remainingTurns, strength, false, false)
     {
         IconColor = Color.DarkGray;
     }
@@ -19,7 +19,7 @@ public class 怖吓 : BaseBuff
     
     public override void UpdateBuff(Character character)
     {
-        // 每次UpdateBuff都重新应用效果，因为Character.UpdateBuffs()会先ResetAttributes()
+        // 姣忔UpdateBuff閮介噸鏂板簲鐢ㄦ晥鏋滐紝鍥犱负Character.UpdateBuffs()浼氬厛ResetAttributes()
         character.AttackLevelAdjustment -= Strength;
     }
     

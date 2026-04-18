@@ -1,4 +1,4 @@
-using TurnBasedRPG.Characters;
+﻿using TurnBasedRPG.Characters;
 
 namespace TurnBasedRPG.Characters.Allies;
 

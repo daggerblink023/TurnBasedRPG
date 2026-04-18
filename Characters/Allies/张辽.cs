@@ -1,4 +1,4 @@
-using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using TurnBasedRPG.Characters;
@@ -26,8 +26,8 @@ public class 张辽 : Character
     
     public 张辽(bool hasCustomConstructor = false, bool isAlly = true) : base("张辽", 73, 3.5f, 40, 2, -2, isAlly)
     {
-        PassiveName = "决断-张辽";
-        PassiveSkill = "使自身获得[决断-张辽]与[武道独尊]\n\n张辽的初始暴击率为100%，结算伤害时每溢出1%最终暴击率会临时增加1%暴击伤害\n\n同队魏国武将的技能3命中敌方单位时，张辽会使用[破溃]对该目标进行单方面攻击，此次[破溃]的最终伤害加成降低60%。每回合至多触发一次\n\n[回合结束时]属于自身的每个行动槽会额外丢弃处于备选位置的技能，并将[决断-张辽]的状态强度设置为被额外丢弃的技能中最高的技能等级";
+        PassiveName = "决断_张辽";
+        PassiveSkill = "使自身获得[决断_张辽]与[武道独尊]\n\n张辽的初始暴击率为100%，结算伤害时每溢出1%最终暴击率会临时增加1%暴击伤害\n\n同队魏国武将的技能3命中敌方单位时，张辽会使用[破溃]对该目标进行单方面攻击，此次[破溃]的最终伤害加成降低60%。每回合至多触发一次\n\n[回合结束时]属于自身的每个行动槽会额外丢弃处于备选位置的技能，并将[决断_张辽]的状态强度设置为被额外丢弃的技能中最高的技能等级";
         ShieldEffectiveness = 1.0f;
         Faction = Faction.魏;
         
@@ -113,7 +113,7 @@ public class 张辽 : Character
         _tianXiaoTriggerCount = 0;
         _jiXingCritRateTriggerCount = 0;
         
-        // 检查并添加决断-张辽状态（仅在不存在时添加）
+        // 检查并添加决断_张辽状态（仅在不存在时添加）
         if (!buffHandler.CheckBuff<决断_张辽>(this))
         {
             buffHandler.AddBuff(this, new 决断_张辽(null, 1));
@@ -125,7 +125,7 @@ public class 张辽 : Character
             buffHandler.AddBuff(this, new 武道独尊());
         }
         
-        // 处理决断-张辽的回合开始效果
+        // 处理决断_张辽的回合开始效果
         var jueDuanBuff = buffHandler.GetBuffs(this).Find(b => b is 决断_张辽);
         if (jueDuanBuff is 决断_张辽)
         {
@@ -189,7 +189,6 @@ public class 张辽 : Character
             
         if (attacker.Faction == Faction.魏 && _currentKuiPoTriggerThisTurn < _maxKuiPoTriggerPerTurn)
         {
-            Game1.Log($"[张辽-触发判定] 同队魏国武将技能3命中，触发破溃攻击");
             _currentKuiPoTriggerThisTurn++;
             // 破溃触发将在BattleSystem中处理
         }

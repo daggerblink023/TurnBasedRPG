@@ -9,7 +9,7 @@ public class 默守 : BaseBuff
     public Character LastShieldHitAttacker { get; set; }
     
     public 默守(int? remainingTurns = null, int strength = 0) 
-        : base("默守", "曹仁正在积蓄锋芒，等待反戈之�?, remainingTurns, strength)
+        : base("默守", "曹仁正在积蓄锋芒，等待反戈之机", remainingTurns, strength)
     {
         IconColor = Color.DarkOrange;
         LastShieldHitAttacker = null;

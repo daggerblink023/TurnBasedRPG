@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using TurnBasedRPG.Characters;
 
 namespace TurnBasedRPG.Buffs;
@@ -25,16 +25,18 @@ public abstract class BaseBuff
     
     public virtual void UpdateBuff(Character character)
     {
-        // 子类可以重写此方法来实现具体的buff效果
+        // 瀛愮被鍙互閲嶅啓姝ゆ柟娉曟潵瀹炵幇鍏蜂綋鐨刡uff鏁堟灉
     }
     
     public virtual void OnAdded(Character character)
     {
-        // 当buff被添加到角色身上时调�?    }
+        // 被添加到角色时执行的操作
+    }
     
     public virtual void OnRemoved(Character character)
     {
-        // 当buff从角色身上被移除时调�?    }
+        // 被移除角色时执行的操作
+    }
     
     public virtual bool ShouldRemove()
     {
